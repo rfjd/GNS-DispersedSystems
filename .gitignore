@@ -1,0 +1,15 @@
+*converted*
+*~
+*aux
+*log
+*bbl
+*blg
+*out
+*gz
+stuff/
+.ipynb_checkpoints/
+*.npz
+*.npy
+*.json
+*#
+*__pycache__*
