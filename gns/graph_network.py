@@ -69,7 +69,7 @@ class Encoder(nn.Module):
       nnode_in_features: Number of node input features (for 2D = 30, calculated
         as [10 = 5 times steps * 2 positions (x, y) +
         4 distances to boundaries (top/bottom/left/right) +
-        16 particle type embeddings]).
+        16 particle type embeddings]). # RFAK: will change
       nnode_out_features: Number of node output features (latent dimension of
         size 128).
       nedge_in_features: Number of edge input features (for 2D = 3, calculated
@@ -313,7 +313,7 @@ class Decoder(nn.Module):
 
     Args:
       nnode_in: Number of node inputs (latent dimension of size 128).
-      nnode_out: Number of node outputs (particle dimension).
+      nnode_out: Number of node outputs (particle dimension). # RFAK: will change
       nmlp_layer: Number of hidden layers in the MLP (typically of size 2).
       mlp_hidden_dim: Size of the hidden layer (latent dimension of size 128).
     """
