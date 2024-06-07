@@ -63,7 +63,7 @@ class LearnedSimulator(nn.Module):
     # Initialize the EncodeProcessDecode
     self._encode_process_decode = graph_network.EncodeProcessDecode(
         nnode_in_features=nnode_in,
-        nnode_out_features=particle_dimensions,
+        nnode_out_features=particle_dimensions+1,# give angular acceleration as well
         nedge_in_features=nedge_in,
         latent_dim=latent_dim,
         nmessage_passing_steps=nmessage_passing_steps,
@@ -108,6 +108,7 @@ class LearnedSimulator(nn.Module):
 
     return receivers, senders
 
+  # RFAK: the following changes% an important function for us
   def _encoder_preprocessor(
           self,
           position_sequence: torch.tensor,
@@ -115,12 +116,12 @@ class LearnedSimulator(nn.Module):
           particle_types: torch.tensor,
           material_property: torch.tensor = None):
     """Extracts important features from the position sequence. Returns a tuple
-    of node_features (nparticles, 30), edge_index (nparticles, nparticles), and
+    of node_features (nparticles, 35), edge_index (nparticles, nparticles), and
     edge_features (nparticles, 3).
 
     Args:
       position_sequence: A sequence of particle positions. Shape is
-        (nparticles, 6, dim). Includes current + last 5 positions
+        (nparticles, 6, dim+1). Includes current + last 5 positions
       nparticles_per_example: Number of particles per example. Default is 2
         examples per batch.
       particle_types: Particle types with shape (nparticles).
@@ -132,7 +133,7 @@ class LearnedSimulator(nn.Module):
 
     # Get connectivity of the graph with shape of (nparticles, 2)
     senders, receivers = self._compute_graph_connectivity(
-        most_recent_position, nparticles_per_example, self._connectivity_radius)
+        most_recent_position[:,:-1], nparticles_per_example, self._connectivity_radius)
     node_features = []
 
     # Normalized velocity sequence, merging spatial an time axis.
@@ -168,15 +169,15 @@ class LearnedSimulator(nn.Module):
       particle_type_embeddings = self._particle_type_embedding(
           particle_types)
       node_features.append(particle_type_embeddings)
-    # Final node_features shape (nparticles, 30) for 2D (if material_property is not valid in training example)
-    # 30 = 10 (5 velocity sequences*dim) + 4 boundaries + 16 particle embedding
+    # Final node_features shape (nparticles, 35) for 2D (if material_property is not valid in training example)
+    # 35 = 15 (5 velocity sequences*(dim+1)) + 4 boundaries + 16 particle embedding
 
     # Material property
     if material_property is not None:
         material_property = material_property.view(nparticles, 1)
         node_features.append(material_property)
     # Final node_features shape (nparticles, 31) for 2D
-    # 31 = 10 (5 velocity sequences*dim) + 4 boundaries + 16 particle embedding + 1 material property
+    # 35 = 10 (5 velocity sequences*dim) + 4 boundaries + 16 particle embedding + 1 material property
 
     # Collect edge features.
     edge_features = []
@@ -188,8 +189,8 @@ class LearnedSimulator(nn.Module):
     #     torch.gather(most_recent_position, 0, receivers)
     # ) / self._connectivity_radius
     normalized_relative_displacements = (
-        most_recent_position[senders, :] -
-        most_recent_position[receivers, :]
+        most_recent_position[senders, :-1] -
+        most_recent_position[receivers, :-1]
     ) / self._connectivity_radius
 
     # Add relative displacement between two particles as an edge feature
@@ -215,8 +216,8 @@ class LearnedSimulator(nn.Module):
     normalization.
 
     Args:
-      normalized_acceleration: Normalized acceleration (nparticles, dim).
-      position_sequence: Position sequence of shape (nparticles, dim).
+      normalized_acceleration: Normalized acceleration (nparticles, dim+1).
+      position_sequence: Position sequence of shape (nparticles, dim+1).
 
     Returns:
       torch.tensor: New position of the particles.
@@ -247,7 +248,7 @@ class LearnedSimulator(nn.Module):
     """Predict position based on acceleration.
 
     Args:
-      current_positions: Current particle positions (nparticles, dim).
+      current_positions: Current particle positions (nparticles, dim+1).
       nparticles_per_example: Number of particles per example. Default is 2
         examples per batch.
       particle_types: Particle types with shape (nparticles).
@@ -279,19 +280,19 @@ class LearnedSimulator(nn.Module):
     """Produces normalized and predicted acceleration targets.
 
     Args:
-      next_positions: Tensor of shape (nparticles_in_batch, dim) with the
+      next_positions: Tensor of shape (nparticles_in_batch, dim+1) with the
         positions the model should output given the inputs.
       position_sequence_noise: Tensor of the same shape as `position_sequence`
         with the noise to apply to each particle.
       position_sequence: A sequence of particle positions. Shape is
-        (nparticles, 6, dim). Includes current + last 5 positions.
+        (nparticles, 6, dim+1). Includes current + last 5 positions.
       nparticles_per_example: Number of particles per example. Default is 2
         examples per batch.
       particle_types: Particle types with shape (nparticles).
       material_property: Friction angle normalized by tan() with shape (nparticles).
 
     Returns:
-      Tensors of shape (nparticles_in_batch, dim) with the predicted and target
+      Tensors of shape (nparticles_in_batch, dim+1) with the predicted and target
         normalized accelerations.
 
     """
@@ -332,10 +333,10 @@ class LearnedSimulator(nn.Module):
     """Inverse of `_decoder_postprocessor`.
 
     Args:
-      next_position: Tensor of shape (nparticles_in_batch, dim) with the
+      next_position: Tensor of shape (nparticles_in_batch, dim+1) with the
         positions the model should output given the inputs.
       position_sequence: A sequence of particle positions. Shape is
-        (nparticles, 6, dim). Includes current + last 5 positions.
+        (nparticles, 6, dim+1). Includes current + last 5 positions.
 
     Returns:
       normalized_acceleration (torch.tensor): Normalized acceleration.
