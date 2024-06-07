@@ -60,7 +60,7 @@ class Render():
         self.loss = self.rollout_data['loss'].item()
 
         # Trajectory information
-        self.dims = trajectory[rollout_cases[0][0]].shape[2]
+        self.dims = trajectory[rollout_cases[0][0]].shape[2]-1
         self.num_particles = trajectory[rollout_cases[0][0]].shape[1]
         self.num_steps = trajectory[rollout_cases[0][0]].shape[0]
         self.boundaries = rollout_data["metadata"]["bounds"]
@@ -119,7 +119,7 @@ class Render():
         # calculate point size for scatter plot
         boxSize = self.rollout_data["metadata"]["boxSize"]
         points_whole_ax = subplot_width*0.8*72# 1 point = dpi / 72 pixels
-        points_radius = 1/boxSize*points_whole_ax
+        points_radius = 2/boxSize*points_whole_ax
         point_size = points_radius**2
         
         # Calculate the overall figure size
