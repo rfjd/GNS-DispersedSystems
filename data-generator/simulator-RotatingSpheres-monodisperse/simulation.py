@@ -167,7 +167,7 @@ def main(_):
     
 
         data_tuple = np.empty(2, dtype=object)
-        data_tuple[0] = position/L # normalized
+        data_tuple[0] = position
         data_tuple[1] = particle_type
         np.save(f"{data_category}{tr}.npy", data_tuple)
 
@@ -224,7 +224,8 @@ def main(_):
             "vel_mean": vel_mean.tolist(),
             "vel_std": vel_std.tolist(),
             "acc_mean": acc_mean.tolist(),
-            "acc_std": acc_std.tolist()
+            "acc_std": acc_std.tolist(),
+            "boxSize": L
         }
 
         # Write the metadata dictionary to a JSON file
