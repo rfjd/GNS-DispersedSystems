@@ -188,43 +188,31 @@ def main(_):
     if data_category == 'train':
         train_data = np.load('train.npz', allow_pickle=True)
         num_trajectories = len(train_data.files)
-        vel_mean_vec = np.zeros((num_trajectories,2))
-        vel_std_vec = np.zeros((num_trajectories,2))
-        acc_mean_vec = np.zeros((num_trajectories,2))
-        acc_std_vec = np.zeros((num_trajectories,2))
+        vel_mean_vec = np.zeros((num_trajectories,3))
+        vel_std_vec = np.zeros((num_trajectories,3))
+        acc_mean_vec = np.zeros((num_trajectories,3))
+        acc_std_vec = np.zeros((num_trajectories,3))
     
-        angvel_mean_vec = np.zeros((num_trajectories,))
-        angvel_std_vec = np.zeros((num_trajectories,))
-        angacc_mean_vec = np.zeros((num_trajectories,))
-        angacc_std_vec = np.zeros((num_trajectories,))
         for idx in range(len(train_data.files)):
             st=train_data[f'simulation_trajectory_{idx}']
             position = st[0]
             num_steps = position.shape[0]
             N = position.shape[1]
-            vel = acc = np.zeros((num_steps,N,2))
-            angvel = angacc = np.zeros((num_steps,N))
+            vel = acc = np.zeros((num_steps,N,3))
             for i in range(1,num_steps):
-                vel[i,:,:] = (position[i,:,:2]-position[i-1,:,:2])/dt
-                angvel[i,:] = (position[i,:,2]-position[i-1,:,2])/dt
+                vel[i,:,:] = (position[i,:,:]-position[i-1,:,:])/dt
 
             for i in range(1,num_steps-1):
-                acc[i,:,:] = (position[i+1,:,:2]-2*position[i,:,:2]+position[i-1,:,:2])/(dt**2)
-                angacc[i,:] = (position[i+1,:,2]-2*position[i,:,2]+position[i-1,:,2])/(dt**2)
+                acc[i,:,:] = (position[i+1,:,:]-2*position[i,:,:]+position[i-1,:,:])/(dt**2)
         
-            vel, angvel = vel[2:,:,:], angvel[2:,:]
-            acc, angacc = acc[1:-1,:,:], angacc[1:-1,:]
+            vel = vel[2:,:,:]
+            acc = acc[1:-1,:,:]
         
             vel_mean_vec[idx], vel_std_vec[idx] = np.mean(vel, axis=(0,1)), np.std(vel, axis=(0,1))
             acc_mean_vec[idx], acc_std_vec[idx] = np.mean(acc, axis=(0,1)), np.std(acc, axis=(0,1))
-            angvel_mean_vec[idx], angvel_std_vec[idx] = np.mean(angvel, axis=(0,1)), np.std(angvel, axis=(0,1))
-            angacc_mean_vec[idx], angacc_std_vec[idx] = np.mean(angacc, axis=(0,1)), np.std(angacc, axis=(0,1))
 
         vel_mean, acc_mean = np.mean(vel_mean_vec, axis=0), np.mean(acc_mean_vec, axis=0) 
         vel_std, acc_std = np.mean(vel_std_vec**2+(vel_mean_vec-vel_mean)**2, axis=0), np.mean(acc_std_vec**2+(acc_mean_vec-acc_mean)**2, axis=0)
-        angvel_mean, angacc_mean = np.mean(angvel_mean_vec, axis=0), np.mean(angacc_mean_vec, axis=0)
-        angvel_std, angacc_std = np.mean(angvel_std_vec**2+(angvel_mean_vec-angvel_mean)**2, axis=0), np.mean(angacc_std_vec**2+(angacc_mean_vec-angacc_mean)**2, axis=0)
-    
 
         # Define the metadata dictionary
         metadata = {
@@ -236,11 +224,7 @@ def main(_):
             "vel_mean": vel_mean.tolist(),
             "vel_std": vel_std.tolist(),
             "acc_mean": acc_mean.tolist(),
-            "acc_std": acc_std.tolist(),
-            "angvel_mean": angvel_mean.tolist(),
-            "angvel_std": angvel_std.tolist(),
-            "angacc_mean": angacc_mean.tolist(),
-            "angacc_std": angacc_std.tolist(),
+            "acc_std": acc_std.tolist()
         }
 
         # Write the metadata dictionary to a JSON file
