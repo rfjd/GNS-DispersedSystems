@@ -1,11 +1,11 @@
 DIR="RUNS"
-DATASET_NAME="SpheresBox" #"WaterDroplet"
+DATASET_NAME="RotatingSpheres-monodisperse"
 
 DATA_PATH="data/${DATASET_NAME}/"
 MODEL_PATH="${DIR}/${DATASET_NAME}/models/"
 ROLLOUT_PATH="${DIR}/${DATASET_NAME}/rollout/"
 
-number_steps=1000000
+number_steps=100
 
 mkdir -p ${MODEL_PATH}
 mkdir -p ${ROLLOUT_PATH}
