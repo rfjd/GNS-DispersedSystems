@@ -152,9 +152,9 @@ class LearnedSimulator(nn.Module):
     boundaries = torch.tensor(
         self._boundaries, requires_grad=False).float().to(self._device)
     distance_to_lower_boundary = (
-        most_recent_position - boundaries[:, 0][None])
+        most_recent_position[:,:-1] - boundaries[:, 0][None])
     distance_to_upper_boundary = (
-        boundaries[:, 1][None] - most_recent_position)
+        boundaries[:, 1][None] - most_recent_position[:,:-1])
     distance_to_boundaries = torch.cat(
         [distance_to_lower_boundary, distance_to_upper_boundary], dim=1)
     normalized_clipped_distance_to_boundaries = torch.clamp(
