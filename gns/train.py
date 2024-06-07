@@ -65,7 +65,7 @@ def rollout(
 
   Args:
     simulator: Learned simulator.
-    position: Positions of particles (timesteps, nparticles, ndims)
+    position: Positions of particles (timesteps, nparticles, ndims+1) #RFAK: 1 added for theta
     particle_types: Particles types with shape (nparticles)
     material_property: Friction angle normalized by tan() with shape (nparticles)
     n_particles_per_example
@@ -105,7 +105,7 @@ def rollout(
   predictions = torch.stack(predictions)
   ground_truth_positions = ground_truth_positions.permute(1, 0, 2)
 
-  loss = (predictions - ground_truth_positions) ** 2
+  loss = (predictions - ground_truth_positions) ** 2 #RFAK: make sure to normalize the positions and angles? Is it needed? velocity and acceleration are being normalized already. So maybe just divide by pi*L^2 or something similar.
 
   output_dict = {
       'initial_positions': initial_positions.permute(1, 0, 2).cpu().numpy(),
@@ -154,7 +154,7 @@ def predict(device: str):
     material_property_as_feature = False
   else:
     raise NotImplementedError
-
+  
   eval_loss = []
   with torch.no_grad():
     for example_i, features in enumerate(ds):
@@ -282,9 +282,7 @@ def train(rank, flags, world_size, device):
   simulator.to(device_id)
 
   if device == torch.device("cuda"):
-    dl = distribute.get_data_distributed_dataloader_by_samples(path=f'{flags["data_path"]}train.npz',
-                                                               input_length_sequence=INPUT_SEQUENCE_LENGTH,
-                                                               batch_size=flags["batch_size"])
+    dl = distribute.get_data_distributed_dataloader_by_samples(path=f'{flags["data_path"]}train.npz', input_length_sequence=INPUT_SEQUENCE_LENGTH, batch_size=flags["batch_size"])
   else:
     dl = data_loader.get_data_loader_by_samples(path=f'{flags["data_path"]}train.npz',
                                                 input_length_sequence=INPUT_SEQUENCE_LENGTH,
@@ -430,7 +428,7 @@ def _get_simulator(
   else:
     # Given that there is no additional node feature (e.g., material_property) except for:
     # (position (dim), velocity (dim*6), particle_type (16)),
-    nnode_in = 37 if metadata['dim'] == 3 else 30
+    nnode_in = 37 if metadata['dim'] == 3 else 35 # RFAK: 30 here changes for us
     nedge_in = metadata['dim'] + 1
 
   # Init simulator.
