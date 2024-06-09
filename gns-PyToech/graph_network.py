@@ -38,9 +38,9 @@ def build_mlp(
   # Create a torch sequential container
   mlp = nn.Sequential()
   for i in range(nlayers):
-    mlp.add_module("NN-" + str(i), nn.Linear(layer_sizes[i],
+    mlp.add_module("Linear-" + str(i), nn.Linear(layer_sizes[i],
                                              layer_sizes[i + 1]))
-    mlp.add_module("Act-" + str(i), act[i]())
+    mlp.add_module("Activation-" + str(i), act[i]())
 
   return mlp
 
