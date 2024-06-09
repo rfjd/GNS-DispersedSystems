@@ -111,7 +111,7 @@ def animate(frame, particles, circles, dots, position):
         p.vy -= g*dt  # Gravity
         p.x += p.vx*dt
         p.y += p.vy*dt
-        p.theta += p.omega*dt # Update rotation angle
+        p.theta = (p.theta + p.omega*dt) % (2*np.pi)
         
         # Handle wall collisions
         handle_wall_collisions(p, L)
@@ -165,8 +165,9 @@ def main(_):
         del ani
         plt.close()
     
-
         data_tuple = np.empty(2, dtype=object)
+        position[:,:,:2] /= L
+        position[:,:,2] /= 2*np.pi
         data_tuple[0] = position
         data_tuple[1] = particle_type
         np.save(f"{data_category}{tr}.npy", data_tuple)
@@ -183,7 +184,6 @@ def main(_):
     # Save all data into a single .npz file
     np.savez(f"{data_category}.npz", **data_dict)
     os.system("rm *.npy")
-
 
     if data_category == 'train':
         train_data = np.load('train.npz', allow_pickle=True)
@@ -216,9 +216,9 @@ def main(_):
 
         # Define the metadata dictionary
         metadata = {
-            "bounds": [[0, L], [0, L]],
+            "bounds": [[0, 1], [0, 1]],
             "sequence_length": num_steps,
-            "default_connectivity_radius": 4,
+            "default_connectivity_radius": 4/L,
             "dim": 2,
             "dt": dt,
             "vel_mean": vel_mean.tolist(),
