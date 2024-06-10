@@ -107,7 +107,7 @@ class InteractionNetwork(gnn.MessagePassing):
         super().__init__(aggr='add')
         # method for node MLP
         # features a node and its updated version go through MLP; see the update method below.
-        node_mlp = build_mlp(2*num_encoded_node_features,
+        node_mlp = build_mlp(num_encoded_node_features+num_encoded_edge_features,
                              [mlp_layer_size for _ in range(num_mlp_layers)],
                              num_encoded_node_features)
         self.node_mlp = nn.Sequential(*node_mlp,nn.LayerNorm(num_encoded_node_features))
@@ -133,11 +133,29 @@ class InteractionNetwork(gnn.MessagePassing):
 
         Returns: updated node and edge embeddings0
         """
+        print(f"inside forwqard: x.shape={x.shape}")
+        print(f"inside forwqard: e.shape={e.shape}")
         x_residual, e_residual = x, e
-        self.propagate(edge_index, x=x, edge_features=e)
+        x, e = self.propagate(edge_index, x=x, e=e)
+        # the propagate method internally calls message, aggregate, and update 
         return x+x_residual, e+e_residual
 
+    def message(self,
+                x_i: torch.tensor,
+                x_j: torch.tensor,
+                e: torch.tensor):
+        print(x_i.shape)
+        print(x_j.shape)
+        print(e.shape)
+        return self.edge_mlp(torch.cat([x_i, x_j, e], dim=-1))
 
+    def update(self,
+               x_updated: torch.tensor,
+               x: torch.tensor,
+               e: torch.tensor):
+        print(f"x_updated.shape={x_updated.shape}")
+        return self.node_mlp(torch.cat([x_updated, x], dim=-1)), e
+        
 # num_node_features = 10
 # node_embedding_size = 13
 # num_edge_features = 15
@@ -170,15 +188,15 @@ mlp_layer_size = 74
 GN = InteractionNetwork(number_embedded_node_features,number_embedded_edge_features,num_mlp_layers,mlp_layer_size)
 # x = torch.rand(number_particles, number_embedded_node_features)
 # e = torch.rand(number_edges, number_embedded_edge_features)
-x=torch.tensor([[4.4647e-01, 6.0369e-01, 5.7371e-01, 3.4733e-01, 7.6309e-01, 6.6871e-01,
-         1.7654e-02, 3.6207e-01, 2.0304e-01, 7.1463e-01, 7.7116e-04, 7.0299e-02],
-        [5.9259e-02, 3.2826e-01, 1.1441e-01, 4.0033e-01, 2.1547e-01, 8.2144e-01,
-         9.3869e-01, 6.9342e-01, 3.0600e-01, 7.0400e-01, 7.0669e-02, 2.4992e-01],
-        [3.9518e-01, 3.2514e-02, 9.6887e-01, 8.2764e-01, 7.3163e-01, 7.3500e-01,
-         9.9204e-01, 3.0989e-01, 6.1994e-01, 3.3186e-01, 4.1512e-01, 9.0099e-02]])
-e=torch.tensor([[0.7990, 0.1398, 0.2765, 0.9457, 0.2066, 0.5643, 0.0411],
-        [0.2096, 0.9536, 0.7689, 0.5212, 0.2507, 0.8813, 0.9706],
-        [0.6002, 0.1777, 0.5172, 0.7436, 0.6460, 0.9499, 0.9503]])
+x=torch.tensor([[0.4068, 0.6481, 0.7135, 0.1610, 0.5588, 0.3934, 0.0498, 0.5882, 0.6069,
+         0.1175, 0.9703, 0.7622],
+        [0.7843, 0.0643, 0.0680, 0.7160, 0.7887, 0.0712, 0.9801, 0.3898, 0.0946,
+         0.1332, 0.3840, 0.7631],
+        [0.1552, 0.8684, 0.9997, 0.9700, 0.7276, 0.2957, 0.3099, 0.8590, 0.3956,
+         0.5765, 0.9998, 0.0030]])
+e=torch.tensor([[0.3858, 0.3023, 0.4191, 0.5206, 0.3917, 0.9854, 0.7028],
+        [0.1859, 0.9845, 0.3612, 0.5720, 0.5467, 0.1325, 0.7544],
+        [0.1962, 0.0545, 0.9197, 0.7994, 0.2907, 0.1421, 0.9515]])
 
 edge_index = torch.tensor([[0, 0, 1],
                            [1, 2, 2]])

@@ -136,7 +136,7 @@ class InteractionNetwork(gnn.MessagePassing):
     super(InteractionNetwork, self).__init__(aggr='add')
     # Node MLP
     # I have changed nedge_out here to nnode_in (which is set equal to nnode_out). The results f this code is equivalent to the one I get from my code. However, there is something funny going on with the propagate method. It needs to be discussed.
-    self.node_fn = nn.Sequential(*[build_mlp(nnode_in + nnode_in,
+    self.node_fn = nn.Sequential(*[build_mlp(nnode_in + nedge_out,
                                              [mlp_hidden_dim
                                               for _ in range(nmlp_layers)],
                                              nnode_out),
@@ -175,51 +175,51 @@ class InteractionNetwork(gnn.MessagePassing):
 
     return x + x_residual, edge_features + edge_features_residual
 
-  # def message(self,
-  #             x_i: torch.tensor,
-  #             x_j: torch.tensor,
-  #             edge_features: torch.tensor) -> torch.tensor:
-  #   """Constructs message from j to i of edge :math:`e_{i, j}`. Tensors :obj:`x`
-  #   passed to :meth:`propagate` can be mapped to the respective nodes :math:`i`
-  #   and :math:`j` by appending :obj:`_i` or :obj:`_j` to the variable name,
-  #   i.e., :obj:`x_i` and :obj:`x_j`.
+  def message(self,
+              x_i: torch.tensor,
+              x_j: torch.tensor,
+              edge_features: torch.tensor) -> torch.tensor:
+    """Constructs message from j to i of edge :math:`e_{i, j}`. Tensors :obj:`x`
+    passed to :meth:`propagate` can be mapped to the respective nodes :math:`i`
+    and :math:`j` by appending :obj:`_i` or :obj:`_j` to the variable name,
+    i.e., :obj:`x_i` and :obj:`x_j`.
 
-  #   Args:
-  #     x_i: Particle state representation as a torch tensor with shape
-  #       (nparticles, nnode_in=latent_dim of 128) at node i
-  #     x_j: Particle state representation as a torch tensor with shape
-  #       (nparticles, nnode_in=latent_dim of 128) at node j
-  #     edge_features: Edge features as a torch tensor with shape
-  #       (nedges, nedge_in=latent_dim of 128)
+    Args:
+      x_i: Particle state representation as a torch tensor with shape
+        (nparticles, nnode_in=latent_dim of 128) at node i
+      x_j: Particle state representation as a torch tensor with shape
+        (nparticles, nnode_in=latent_dim of 128) at node j
+      edge_features: Edge features as a torch tensor with shape
+        (nedges, nedge_in=latent_dim of 128)
 
-  #   """
-  #   # Concat edge features with a final shape of [nedges, latent_dim*3]
-  #   edge_features = torch.cat([x_i, x_j, edge_features], dim=-1)
-  #   edge_features = self.edge_fn(edge_features)
-  #   return edge_features
+    """
+    # Concat edge features with a final shape of [nedges, latent_dim*3]
+    edge_features = torch.cat([x_i, x_j, edge_features], dim=-1)
+    edge_features = self.edge_fn(edge_features)
+    return edge_features
 
-  # def update(self,
-  #            x_updated: torch.tensor,
-  #            x: torch.tensor,
-  #            edge_features: torch.tensor):
-  #   """Update the particle state representation
+  def update(self,
+             x_updated: torch.tensor,
+             x: torch.tensor,
+             edge_features: torch.tensor):
+    """Update the particle state representation
 
-  #   Args:
-  #     x: Particle state representation as a torch tensor with shape 
-  #       (nparticles, nnode_in=latent_dim of 128)
-  #     x_updated: Updated particle state representation as a torch tensor with 
-  #       shape (nparticles, nnode_in=latent_dim of 128)
-  #     edge_features: Edge features as a torch tensor with shape 
-  #       (nedges, nedge_out=latent_dim of 128)
+    Args:
+      x: Particle state representation as a torch tensor with shape 
+        (nparticles, nnode_in=latent_dim of 128)
+      x_updated: Updated particle state representation as a torch tensor with 
+        shape (nparticles, nnode_in=latent_dim of 128)
+      edge_features: Edge features as a torch tensor with shape 
+        (nedges, nedge_out=latent_dim of 128)
 
-  #   Returns:
-  #     tuple: Updated node and edge features
-  #   """
-  #   # Concat node features with a final shape of
-  #   # [nparticles, latent_dim (or nnode_in) *2]
-  #   x_updated = torch.cat([x_updated, x], dim=-1)
-  #   x_updated = self.node_fn(x_updated)
-  #   return x_updated, edge_features
+    Returns:
+      tuple: Updated node and edge features
+    """
+    # Concat node features with a final shape of
+    # [nparticles, latent_dim (or nnode_in) *2]
+    x_updated = torch.cat([x_updated, x], dim=-1)
+    x_updated = self.node_fn(x_updated)
+    return x_updated, edge_features
 
 
 torch.manual_seed(42)
