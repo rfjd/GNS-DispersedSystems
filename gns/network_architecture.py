@@ -192,8 +192,81 @@ class Processor(gnn.MessagePassing):
         return x, e
 
 
+class Decoder(nn.Module):
+    """
+    This class decodes the encoded node features (output of the Processor) into the target output via an MLP. The constructor gets the same arguments:
+    num_encoded_node_features
+    output_node_size: e.g., equal to number of spatial dimensions of the problem in case the target is acceleration: a_x, a_y, a_z for a three-dimensional system
+    num_mlp_layers
+    mlp_layer_size
+    """
+    def __init__(self,
+                 num_encoded_node_features: int,
+                 output_node_size: int,
+                 num_mlp_layers: int,
+                 mlp_layer_size: int):
+        super().__init__()
+        self.node_mlp = build_mlp(num_encoded_node_features,
+                                  [mlp_layer_size for _ in range(num_mlp_layers)],
+                                  output_node_size)
+
+    def forward(self, x: torch.tensor):
+        return self.node_mlp(x)
 
 
+
+class EncoderProcessorDecoder(nn.Module):
+    """
+    This class puts everything together. The constructor gets the following arguments:
+        num_node_features: length of the vector representation of the particles
+        num_encoded_node_features: number of encoded node features after MLP
+        num_edge_features: length of the vector representation of edges
+        num_encoded_edge_features: number of encoded edge features after MLP
+        num_mlp_layers: number of MLP hidden layers
+        mlp_layer_size: number of neurons in each hidden MLP layer
+        num_message_passing_steps: number of message passing steps of the Processor
+        output_node_size: size of the node predictions (how manu numbers per particle?)
+    """
+    def __init__(self,
+                 num_node_features: int,
+                 num_encoded_node_features: int,
+                 num_edge_features: int,
+                 num_encoded_edge_features: int,
+                 num_mlp_layers: int,
+                 mlp_layer_size: int,
+                 num_message_passing_steps: int,
+                 output_node_size: int):
+        super().__init__()
+
+        self.encoder = Encoder(num_node_features,
+                               num_encoded_node_features,
+                               num_edge_features,
+                               num_encoded_edge_features,
+                               num_mlp_layers,
+                               mlp_layer_size)
+        
+        self.processor = Processor(num_encoded_node_features,
+                                   num_encoded_edge_features,
+                                   num_mlp_layers,
+                                   mlp_layer_size,
+                                   num_message_passing_steps)
+        self.decoder = Decoder(num_encoded_node_features,
+                               output_node_size,
+                               num_mlp_layers,
+                               mlp_layer_size)
+
+    def forward(self,
+                x: torch.tensor,
+                e: torch.tensor,
+                edge_index: torch.tensor):
+        x, e = self.encoder.forward(x, e)
+        x, e = self.processor.forward(x, e, edge_index)
+        x = self.decoder(x)
+        return x
+
+
+        
+        
 # ### Simple checks
 # num_node_features = 10
 # node_embedding_size = 13
@@ -259,3 +332,14 @@ class Processor(gnn.MessagePassing):
 # x, e = processor.forward(x, e, edge_index)
 # print(f"x={x}")
 # print(f"e={e}")
+
+num_encoded_node_features = 7
+output_size = 3
+num_mlp_layers = 2
+mlp_layer_size = 64
+num_particles = 5
+decoder = Decoder(num_encoded_node_features, output_size, num_mlp_layers, mlp_layer_size)
+x = torch.rand(num_particles, num_encoded_node_features)
+print(x)
+print("Decode...")
+print(decoder.forward(x))
