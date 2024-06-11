@@ -1,5 +1,5 @@
 import torch
-from gns import learned_simulator
+from gnsTorch import learned_simulator
 
 
 def get_random_walk_noise_for_position_sequence(

@@ -15,13 +15,13 @@ flags.DEFINE_integer("seed_number", 1, help="seed number")
 FLAGS = flags.FLAGS
 
 # Constants
-L = 30     # Size of the square box
+L = 15     # Size of the square box
 N = 30     # Number of particles
 radius = 1 # Radius of each particle
 mass = 1   # Mass of each particle
 g = 1      # Gravitational acceleration
 dt = 0.01  # Time step
-tf = 10    # Simulation time
+tf = 1000    # Simulation time
 tM = int(tf/dt)
 restitution_particle = 0.8  # Coefficient of restitution for particle-particle collisions
 restitution_wall = 0.5  # Coefficient of restitution for particle-wall collisions
@@ -123,7 +123,7 @@ def animate(frame, particles, circles, dots, position):
         writePos(particles, position, frame)
         # Update circle positions and rotation dots
         circles[i].center = (p.x, p.y)
-        dots[i].set_data(p.x + p.radius * np.cos(p.theta), p.y + p.radius * np.sin(p.theta))
+        dots[i].set_data([p.x + p.radius * np.cos(p.theta)], [p.y + p.radius * np.sin(p.theta)])
         
     return circles+dots
 
