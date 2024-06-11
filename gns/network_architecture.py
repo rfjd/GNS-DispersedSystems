@@ -164,7 +164,37 @@ class InteractionNetwork(gnn.MessagePassing):
             concatenated [x_updated, x] along the last dimension (shape = (num_particles, num_encoded_node_features+num_encoded_edge_features)), passed through an MLP. Output shape = (num_particles, num_encoded_node_features)
         """
         return self.node_mlp(torch.cat([x_updated, x], dim=-1)), e
-        
+
+
+
+class Processor(gnn.MessagePassing):
+    """
+    This class invokes the InteractionNetwork method forward iteratively to update the node and edge embeddings. The constructor gets the same arguments as those for the InteractionNetwork plus the number of message passing steps.
+    
+    """
+    def __init__(self,
+                 num_encoded_node_features: int,
+                 num_encoded_edge_features: int,
+                 num_mlp_layers: int,
+                 mlp_layer_size: int,
+                 num_message_passing_steps: int):
+        super().__init__(aggr='max')
+        self.gnn_stacks = nn.ModuleList([InteractionNetwork(num_encoded_node_features, num_encoded_edge_features, num_mlp_layers, mlp_layer_size) for _ in range(num_message_passing_steps)])
+
+    def forward(self,
+                x: torch.tensor,
+                e: torch.tensor,
+                edge_index: torch.tensor):
+
+        for gnn in self.gnn_stacks:
+            x, e = gnn.forward(x, e, edge_index)
+
+        return x, e
+
+
+
+
+# ### Simple checks
 # num_node_features = 10
 # node_embedding_size = 13
 # num_edge_features = 15
@@ -187,23 +217,45 @@ class InteractionNetwork(gnn.MessagePassing):
 # print(encoded_x)
 # print(encoded_e)
 
-torch.manual_seed(42)
-number_particles = 4
-number_edges = 3
-number_embedded_node_features = 12
-number_embedded_edge_features = 7
-num_mlp_layers = 2
-mlp_layer_size = 74
-GN = InteractionNetwork(number_embedded_node_features,number_embedded_edge_features,num_mlp_layers,mlp_layer_size)
-x = torch.rand(number_particles, number_embedded_node_features)
-e = torch.rand(number_edges, number_embedded_edge_features)
-edge_index = torch.tensor([[0, 0, 0],
-                           [1, 2, 3]])
+# torch.manual_seed(42)
+# number_particles = 4
+# number_edges = 3
+# number_embedded_node_features = 12
+# number_embedded_edge_features = 7
+# num_mlp_layers = 2
+# mlp_layer_size = 74
+# GN = InteractionNetwork(number_embedded_node_features,number_embedded_edge_features,num_mlp_layers,mlp_layer_size)
+# x = torch.rand(number_particles, number_embedded_node_features)
+# e = torch.rand(number_edges, number_embedded_edge_features)
+# edge_index = torch.tensor([[0, 0, 0],
+#                            [1, 2, 3]])
 
-print(edge_index.shape)
-print(f"x={x}")
-print(f"e={e}")
-print("Message Passing...")
-x, e = GN.forward(x, e, edge_index)
-print(f"x={x}")
-print(f"e={e}")
+# print(f"x={x}")
+# print(f"e={e}")
+# print("Message Passing...")
+# x, e = GN.forward(x, e, edge_index)
+# print(f"x={x}")
+# print(f"e={e}")
+
+
+# num_encoded_node_features = 12
+# num_encoded_edge_features = 7
+# num_mlp_layers = 2
+# mlp_layer_size = 74
+# num_message_passing_steps = 5
+# processor = Processor(num_encoded_node_features, num_encoded_edge_features, num_mlp_layers, mlp_layer_size, num_message_passing_steps)
+# print(f"processor.gnn_stacks={processor.gnn_stacks}")
+
+# num_particles = 4
+# num_edges = 3
+# x = torch.rand(num_particles, num_encoded_node_features)
+# e = torch.rand(num_edges, num_encoded_edge_features)
+# edge_index = torch.tensor([[0, 0, 0],
+#                            [1, 2, 3]])
+
+# print(f"x={x}")
+# print(f"e={e}")
+# print("Processor...")
+# x, e = processor.forward(x, e, edge_index)
+# print(f"x={x}")
+# print(f"e={e}")
