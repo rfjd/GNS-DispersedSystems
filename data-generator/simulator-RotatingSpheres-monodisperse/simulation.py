@@ -15,7 +15,7 @@ flags.DEFINE_integer("seed_number", 1, help="seed number")
 FLAGS = flags.FLAGS
 
 # Constants
-L = 15     # Size of the square box
+L = 30     # Size of the square box
 N = 30     # Number of particles
 radius = 1 # Radius of each particle
 mass = 1   # Mass of each particle

@@ -22,4 +22,4 @@ case=0
 # Renderer
 python3 -m gnsTorch.render_rollout --rollout_dir="${ROLLOUT_PATH}" --rollout_name="rollout_ex${case}" --step_stride=3
 
-mv ${ROLLOUT_PATH}/rollout_ex$case.gif ${ROLLOUT_PATH}/rollout_ex$case-${1000}.gif
+mv ${ROLLOUT_PATH}/rollout_ex$case.gif ${ROLLOUT_PATH}/rollout_ex$case-${number_steps}.gif
