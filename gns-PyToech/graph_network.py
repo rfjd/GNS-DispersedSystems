@@ -2,7 +2,7 @@ from typing import List
 import torch
 import torch.nn as nn
 from torch_geometric.nn import MessagePassing
-import torch_geometric.nn as gnn
+
 
 def build_mlp(
         input_size: int,
@@ -38,9 +38,9 @@ def build_mlp(
   # Create a torch sequential container
   mlp = nn.Sequential()
   for i in range(nlayers):
-    mlp.add_module("L-" + str(i), nn.Linear(layer_sizes[i],
+    mlp.add_module("Linear-" + str(i), nn.Linear(layer_sizes[i],
                                              layer_sizes[i + 1]))
-    mlp.add_module("Act-" + str(i), act[i]())
+    mlp.add_module("Activation-" + str(i), act[i]())
 
   return mlp
 
@@ -111,7 +111,7 @@ class Encoder(nn.Module):
     return self.node_fn(x), self.edge_fn(edge_features)
 
 
-class InteractionNetwork(gnn.MessagePassing):
+class InteractionNetwork(MessagePassing):
   def __init__(
       self,
       nnode_in: int,
@@ -135,7 +135,6 @@ class InteractionNetwork(gnn.MessagePassing):
     # Aggregate features from neighbors
     super(InteractionNetwork, self).__init__(aggr='add')
     # Node MLP
-    # I have changed nedge_out here to nnode_in (which is set equal to nnode_out). The results f this code is equivalent to the one I get from my code. However, there is something funny going on with the propagate method. It needs to be discussed.
     self.node_fn = nn.Sequential(*[build_mlp(nnode_in + nedge_out,
                                              [mlp_hidden_dim
                                               for _ in range(nmlp_layers)],
@@ -150,8 +149,8 @@ class InteractionNetwork(gnn.MessagePassing):
 
   def forward(self,
               x: torch.tensor,
-              edge_features: torch.tensor,
-              edge_index: torch.tensor):
+              edge_index: torch.tensor,
+              edge_features: torch.tensor):
     """The forward hook runs when the InteractionNetwork class is instantiated
 
     Args:
@@ -171,7 +170,8 @@ class InteractionNetwork(gnn.MessagePassing):
     # Start propagating messages.
     # Takes in the edge indices and all additional data which is needed to
     # construct messages and to update node embeddings.
-    x, edge_features = self.propagate(edge_index=edge_index, x=x, edge_features=edge_features)
+    x, edge_features = self.propagate(
+        edge_index=edge_index, x=x, edge_features=edge_features)
 
     return x + x_residual, edge_features + edge_features_residual
 
@@ -222,212 +222,188 @@ class InteractionNetwork(gnn.MessagePassing):
     return x_updated, edge_features
 
 
-torch.manual_seed(42)
-nnode_in = nnode_out = 12
-nedge_in = nedge_out = 7
-nmlp_layers = 2
-mlp_hidden_dim = 74
+class Processor(MessagePassing):
+  """The Processor: :math: `\mathcal{G} \rightarrow \mathcal{G}` computes 
+  interactions among nodes via :math: `M` steps of learned message-passing, to 
+  generate a sequence of updated latent graphs, :math: `G = (G_1 , ..., G_M )`, 
+  where :math: `G^{m+1| = GN^{m+1} (G^m )`. It returns the final graph, 
+  :math: `G^M = PROCESSOR(G^0)`. Message-passing allows information to 
+  propagate and constraints to be respected: the number of message-passing 
+  steps required will likely scale with the complexity of the interactions.
 
-number_particles = 3
-number_edges = 3
-GN = InteractionNetwork(nnode_in, nnode_out, nedge_in, nedge_out, nmlp_layers, mlp_hidden_dim)
-x = torch.rand(number_particles, nnode_in)
-e = torch.rand(number_edges, nedge_in)
-edge_index = torch.tensor([[0, 0, 1],
-                           [1, 2, 2]])
+  """
 
-print(edge_index.shape)
-print(f"x={x}")
-print(f"e={e}")
-print("Message Passing...")
-x, e = GN.forward(x, e, edge_index)
-print(f"x={x}")
-print(f"e={e}")
+  def __init__(
+      self,
+      nnode_in: int,
+      nnode_out: int,
+      nedge_in: int,
+      nedge_out: int,
+      nmessage_passing_steps: int,
+      nmlp_layers: int,
+      mlp_hidden_dim: int,
+  ):
+    """Processor derived from torch_geometric MessagePassing class. The 
+    processor uses a stack of :math: `M GNs` (where :math: `M` is a 
+    hyperparameter) with identical structure, MLPs as internal edge and node 
+    update functions, and either shared or unshared parameters. We use GNs 
+    without global features or global updates (i.e., an interaction network), 
+    and with a residual connections between the input and output latent node 
+    and edge attributes.
 
-# GN.update(x,x,e)
-  
-# class Processor(MessagePassing):
-#   """The Processor: :math: `\mathcal{G} \rightarrow \mathcal{G}` computes 
-#   interactions among nodes via :math: `M` steps of learned message-passing, to 
-#   generate a sequence of updated latent graphs, :math: `G = (G_1 , ..., G_M )`, 
-#   where :math: `G^{m+1| = GN^{m+1} (G^m )`. It returns the final graph, 
-#   :math: `G^M = PROCESSOR(G^0)`. Message-passing allows information to 
-#   propagate and constraints to be respected: the number of message-passing 
-#   steps required will likely scale with the complexity of the interactions.
+    Args:
+      nnode_in: Number of node inputs (latent dimension of size 128).
+      nnode_out: Number of node outputs (latent dimension of size 128).
+      nedge_in: Number of edge inputs (latent dimension of size 128).
+      nedge_out: Number of edge output features (latent dimension of size 128).
+      nmessage_passing_steps: Number of message passing steps.
+      nmlp_layer: Number of hidden layers in the MLP (typically of size 2).
+      mlp_hidden_dim: Size of the hidden layer (latent dimension of size 128).
 
-#   """
+    """
+    super(Processor, self).__init__(aggr='max')
+    # Create a stack of M Graph Networks GNs.
+    self.gnn_stacks = nn.ModuleList([
+        InteractionNetwork(
+            nnode_in=nnode_in,
+            nnode_out=nnode_out,
+            nedge_in=nedge_in,
+            nedge_out=nedge_out,
+            nmlp_layers=nmlp_layers,
+            mlp_hidden_dim=mlp_hidden_dim,
+        ) for _ in range(nmessage_passing_steps)])
 
-#   def __init__(
-#       self,
-#       nnode_in: int,
-#       nnode_out: int,
-#       nedge_in: int,
-#       nedge_out: int,
-#       nmessage_passing_steps: int,
-#       nmlp_layers: int,
-#       mlp_hidden_dim: int,
-#   ):
-#     """Processor derived from torch_geometric MessagePassing class. The 
-#     processor uses a stack of :math: `M GNs` (where :math: `M` is a 
-#     hyperparameter) with identical structure, MLPs as internal edge and node 
-#     update functions, and either shared or unshared parameters. We use GNs 
-#     without global features or global updates (i.e., an interaction network), 
-#     and with a residual connections between the input and output latent node 
-#     and edge attributes.
+  def forward(self,
+              x: torch.tensor,
+              edge_index: torch.tensor,
+              edge_features: torch.tensor):
+    """The forward hook runs through GNN stacks when class is instantiated. 
 
-#     Args:
-#       nnode_in: Number of node inputs (latent dimension of size 128).
-#       nnode_out: Number of node outputs (latent dimension of size 128).
-#       nedge_in: Number of edge inputs (latent dimension of size 128).
-#       nedge_out: Number of edge output features (latent dimension of size 128).
-#       nmessage_passing_steps: Number of message passing steps.
-#       nmlp_layer: Number of hidden layers in the MLP (typically of size 2).
-#       mlp_hidden_dim: Size of the hidden layer (latent dimension of size 128).
+    Args:
+      x: Particle state representation as a torch tensor with shape 
+        (nparticles, latent_dim)
+      edge_index: A torch tensor list of source and target nodes with shape 
+        (2, nedges)
+      edge_features: Edge features as a torch tensor with shape 
+        (nparticles, latent_dim)
 
-#     """
-#     super(Processor, self).__init__(aggr='max')
-#     # Create a stack of M Graph Networks GNs.
-#     self.gnn_stacks = nn.ModuleList([
-#         InteractionNetwork(
-#             nnode_in=nnode_in,
-#             nnode_out=nnode_out,
-#             nedge_in=nedge_in,
-#             nedge_out=nedge_out,
-#             nmlp_layers=nmlp_layers,
-#             mlp_hidden_dim=mlp_hidden_dim,
-#         ) for _ in range(nmessage_passing_steps)])
-
-#   def forward(self,
-#               x: torch.tensor,
-#               edge_index: torch.tensor,
-#               edge_features: torch.tensor):
-#     """The forward hook runs through GNN stacks when class is instantiated. 
-
-#     Args:
-#       x: Particle state representation as a torch tensor with shape 
-#         (nparticles, latent_dim)
-#       edge_index: A torch tensor list of source and target nodes with shape 
-#         (2, nedges)
-#       edge_features: Edge features as a torch tensor with shape 
-#         (nparticles, latent_dim)
-
-#     """
-#     for gnn in self.gnn_stacks:
-#       x, edge_features = gnn(x, edge_index, edge_features)
-#     return x, edge_features
+    """
+    for gnn in self.gnn_stacks:
+      x, edge_features = gnn(x, edge_index, edge_features)
+    return x, edge_features
 
 
-# class Decoder(nn.Module):
-#   """The Decoder: :math: `\mathcal{G} \rightarrow \mathcal{Y}` extracts the 
-#   dynamics information from the nodes of the final latent graph, 
-#   :math: `y_i = \delta v (v_i^M)`
+class Decoder(nn.Module):
+  """The Decoder: :math: `\mathcal{G} \rightarrow \mathcal{Y}` extracts the 
+  dynamics information from the nodes of the final latent graph, 
+  :math: `y_i = \delta v (v_i^M)`
 
-#   """
+  """
 
-#   def __init__(
-#           self,
-#           nnode_in: int,
-#           nnode_out: int,
-#           nmlp_layers: int,
-#           mlp_hidden_dim: int):
-#     """The Decoder coder's learned function, :math: `\detla v`, is an MLP. 
-#     After the Decoder, the future position and velocity are updated using an 
-#     Euler integrator, so the :math: `yi` corresponds to accelerations, 
-#     :math: `\"{p}_i`, with 2D or 3D dimension, depending on the physical domain.
+  def __init__(
+          self,
+          nnode_in: int,
+          nnode_out: int,
+          nmlp_layers: int,
+          mlp_hidden_dim: int):
+    """The Decoder coder's learned function, :math: `\detla v`, is an MLP. 
+    After the Decoder, the future position and velocity are updated using an 
+    Euler integrator, so the :math: `yi` corresponds to accelerations, 
+    :math: `\"{p}_i`, with 2D or 3D dimension, depending on the physical domain.
 
-#     Args:
-#       nnode_in: Number of node inputs (latent dimension of size 128).
-#       nnode_out: Number of node outputs (particle dimension). # RFAK: will change
-#       nmlp_layer: Number of hidden layers in the MLP (typically of size 2).
-#       mlp_hidden_dim: Size of the hidden layer (latent dimension of size 128).
-#     """
-#     super(Decoder, self).__init__()
-#     self.node_fn = build_mlp(
-#         nnode_in, [mlp_hidden_dim for _ in range(nmlp_layers)], nnode_out)
+    Args:
+      nnode_in: Number of node inputs (latent dimension of size 128).
+      nnode_out: Number of node outputs (particle dimension). # RFAK: will change
+      nmlp_layer: Number of hidden layers in the MLP (typically of size 2).
+      mlp_hidden_dim: Size of the hidden layer (latent dimension of size 128).
+    """
+    super(Decoder, self).__init__()
+    self.node_fn = build_mlp(
+        nnode_in, [mlp_hidden_dim for _ in range(nmlp_layers)], nnode_out)
 
-#   def forward(self,
-#               x: torch.tensor):
-#     """The forward hook runs when the Decoder class is instantiated
+  def forward(self,
+              x: torch.tensor):
+    """The forward hook runs when the Decoder class is instantiated
 
-#     Args:
-#       x: Particle state representation as a torch tensor with shape 
-#         (nparticles, nnode_in)
+    Args:
+      x: Particle state representation as a torch tensor with shape 
+        (nparticles, nnode_in)
 
-#     """
-#     return self.node_fn(x)
+    """
+    return self.node_fn(x)
 
 
-# class EncodeProcessDecode(nn.Module):
-#   def __init__(
-#       self,
-#       nnode_in_features: int,
-#       nnode_out_features: int,
-#       nedge_in_features: int,
-#       latent_dim: int,
-#       nmessage_passing_steps: int,
-#       nmlp_layers: int,
-#       mlp_hidden_dim: int,
-#   ):
-#     """Encode-Process-Decode function approximator for learnable simulator.
+class EncodeProcessDecode(nn.Module):
+  def __init__(
+      self,
+      nnode_in_features: int,
+      nnode_out_features: int,
+      nedge_in_features: int,
+      latent_dim: int,
+      nmessage_passing_steps: int,
+      nmlp_layers: int,
+      mlp_hidden_dim: int,
+  ):
+    """Encode-Process-Decode function approximator for learnable simulator.
 
-#     Args:
-#       nnode_in_features: Number of node input features (for 2D = 30, 
-#         calculated as [10 = 5 times steps * 2 positions (x, y) + 
-#         4 distances to boundaries (top/bottom/left/right) + 
-#         16 particle type embeddings]).
-#       nnode_out_features:  Number of node outputs (particle dimension).
-#       nedge_in_features: Number of edge input features (for 2D = 3, 
-#         calculated as [2 (x, y) relative displacements between 2 particles + 
-#         distance between 2 particles]).
-#       latent_dim: Size of latent dimension (128)
-#       nmlp_layer: Number of hidden layers in the MLP (typically of size 2).
-#       mlp_hidden_dim: Size of the hidden layer (latent dimension of size 128).
+    Args:
+      nnode_in_features: Number of node input features (for 2D = 30, 
+        calculated as [10 = 5 times steps * 2 positions (x, y) + 
+        4 distances to boundaries (top/bottom/left/right) + 
+        16 particle type embeddings]).
+      nnode_out_features:  Number of node outputs (particle dimension).
+      nedge_in_features: Number of edge input features (for 2D = 3, 
+        calculated as [2 (x, y) relative displacements between 2 particles + 
+        distance between 2 particles]).
+      latent_dim: Size of latent dimension (128)
+      nmlp_layer: Number of hidden layers in the MLP (typically of size 2).
+      mlp_hidden_dim: Size of the hidden layer (latent dimension of size 128).
 
-#     """
-#     super(EncodeProcessDecode, self).__init__()
-#     self._encoder = Encoder(
-#         nnode_in_features=nnode_in_features,
-#         nnode_out_features=latent_dim,
-#         nedge_in_features=nedge_in_features,
-#         nedge_out_features=latent_dim,
-#         nmlp_layers=nmlp_layers,
-#         mlp_hidden_dim=mlp_hidden_dim,
-#     )
-#     self._processor = Processor(
-#         nnode_in=latent_dim,
-#         nnode_out=latent_dim,
-#         nedge_in=latent_dim,
-#         nedge_out=latent_dim,
-#         nmessage_passing_steps=nmessage_passing_steps,
-#         nmlp_layers=nmlp_layers,
-#         mlp_hidden_dim=mlp_hidden_dim,
-#     )
-#     self._decoder = Decoder(
-#         nnode_in=latent_dim,
-#         nnode_out=nnode_out_features,
-#         nmlp_layers=nmlp_layers,
-#         mlp_hidden_dim=mlp_hidden_dim,
-#     )
+    """
+    super(EncodeProcessDecode, self).__init__()
+    self._encoder = Encoder(
+        nnode_in_features=nnode_in_features,
+        nnode_out_features=latent_dim,
+        nedge_in_features=nedge_in_features,
+        nedge_out_features=latent_dim,
+        nmlp_layers=nmlp_layers,
+        mlp_hidden_dim=mlp_hidden_dim,
+    )
+    self._processor = Processor(
+        nnode_in=latent_dim,
+        nnode_out=latent_dim,
+        nedge_in=latent_dim,
+        nedge_out=latent_dim,
+        nmessage_passing_steps=nmessage_passing_steps,
+        nmlp_layers=nmlp_layers,
+        mlp_hidden_dim=mlp_hidden_dim,
+    )
+    self._decoder = Decoder(
+        nnode_in=latent_dim,
+        nnode_out=nnode_out_features,
+        nmlp_layers=nmlp_layers,
+        mlp_hidden_dim=mlp_hidden_dim,
+    )
 
-#   def forward(self,
-#               x: torch.tensor,
-#               edge_index: torch.tensor,
-#               edge_features: torch.tensor):
-#     """The forward hook runs at instatiation of EncodeProcessorDecode class.
+  def forward(self,
+              x: torch.tensor,
+              edge_index: torch.tensor,
+              edge_features: torch.tensor):
+    """The forward hook runs at instatiation of EncodeProcessorDecode class.
 
-#       Args:
-#         x: Particle state representation as a torch tensor with shape 
-#           (nparticles, nnode_in_features)
-#         edge_index: A torch tensor list of source and target nodes with shape 
-#           (2, nedges)
-#         edge_features: Edge features as a torch tensor with shape 
-#           (nedges, nedge_in_features)
+      Args:
+        x: Particle state representation as a torch tensor with shape 
+          (nparticles, nnode_in_features)
+        edge_index: A torch tensor list of source and target nodes with shape 
+          (2, nedges)
+        edge_features: Edge features as a torch tensor with shape 
+          (nedges, nedge_in_features)
           
-#       Returns:
-#         x: Particle state representation as a torch tensor with shape
-#           (nparticles, nnode_out_features)
-#     """
-#     x, edge_features = self._encoder(x, edge_features)
-#     x, edge_features = self._processor(x, edge_index, edge_features)
-#     x = self._decoder(x)
-#     return x
+      Returns:
+        x: Particle state representation as a torch tensor with shape
+          (nparticles, nnode_out_features)
+    """
+    x, edge_features = self._encoder(x, edge_features)
+    x, edge_features = self._processor(x, edge_index, edge_features)
+    x = self._decoder(x)
+    return x
