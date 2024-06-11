@@ -1,7 +1,7 @@
 import torch
 from torch.utils.data.distributed import DistributedSampler
 
-from gns import data_loader
+from gnsTorch import data_loader
 
 def setup(rank, world_size, device):
     """Initializes distributed training.

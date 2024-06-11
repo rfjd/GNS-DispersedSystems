@@ -13,3 +13,4 @@ stuff/
 *.json
 *#
 *__pycache__*
+venv/

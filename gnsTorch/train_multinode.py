@@ -15,10 +15,10 @@ from absl import flags
 from absl import app
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-from gns import learned_simulator
-from gns import noise_utils
-from gns import reading_utils
-from gns import data_loader
+from gnsTorch import learned_simulator
+from gnsTorch import noise_utils
+from gnsTorch import reading_utils
+from gnsTorch import data_loader
 import torch
 import torch.distributed as dist
 import torchvision.models as models

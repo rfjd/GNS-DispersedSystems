@@ -123,7 +123,7 @@ def animate(frame, particles, circles, dots, position):
         writePos(particles, position, frame)
         # Update circle positions and rotation dots
         circles[i].center = (p.x, p.y)
-        dots[i].set_data(p.x + p.radius * np.cos(p.theta), p.y + p.radius * np.sin(p.theta))
+        dots[i].set_data([p.x + p.radius * np.cos(p.theta)], [p.y + p.radius * np.sin(p.theta)])
         
     return circles+dots
 
