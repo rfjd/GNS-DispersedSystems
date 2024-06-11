@@ -78,8 +78,8 @@ class Encoder(nn.Module):
         The forward method below encodes the nodes and edges.
 
         Arguments:
-            x: node features; shape = (number_particles, num_node_features)
-            e: edge features; shape = (number_edges, num_edge_features) [RF: TOBECHECKED]
+            x: node features; shape = (num_particles, num_node_features)
+            e: edge features; shape = (num_edges, num_edge_features) [RF: TOBECHECKED]
 
         Returns:
             node_encode(x): encoded node features
@@ -89,8 +89,6 @@ class Encoder(nn.Module):
 
 
 
-
-# RF: the gns-Pytorch code seems to have a few mistakes in this class. First, since we stack mutiple message passings in the Processor, the number of features in and out of the MLP should be the same for both nodes and edges. Second, the node_mlp method has a mistake in the number of input features; what's in the code (nnode_in + nedge_out) should change to 2*{number of node features} (in or out since they should be equal).
 class InteractionNetwork(gnn.MessagePassing):
     """
     This class handles message passing and is the building block of the Processor class. The constructor gets the following arguments:
@@ -127,14 +125,12 @@ class InteractionNetwork(gnn.MessagePassing):
         The forward method passes messages and adds residuals to the updated embeddings.
 
         Arguments:
-            x: node embeddings; shape = (number_particles, num_encoded_node_features)
-            e: edge embeddings; shape = (number_edges, num_encoded_edge_features)
+            x: node embeddings; shape = (num_particles, num_encoded_node_features)
+            e: edge embeddings; shape = (num_edges, num_encoded_edge_features)
             edge_index: tensor with shape (2, number_edges) indicating connection between nodes (first row: source, second row: target)
 
         Returns: updated node and edge embeddings0
         """
-        print(f"inside forwqard: x.shape={x.shape}")
-        print(f"inside forwqard: e.shape={e.shape}")
         x_residual, e_residual = x, e
         x, e = self.propagate(edge_index, x=x, e=e)
         # the propagate method internally calls message, aggregate, and update 
@@ -144,16 +140,29 @@ class InteractionNetwork(gnn.MessagePassing):
                 x_i: torch.tensor,
                 x_j: torch.tensor,
                 e: torch.tensor):
-        print(x_i.shape)
-        print(x_j.shape)
-        print(e.shape)
+        """
+        Arguments:
+            x_i, x_j: shape = (number_edges, num_encoded_node_features)
+            e: shape = (number_edges, num_encoded_edge_features)
+
+        Returns:
+            concatenated [x_i, x_j, e] along the last dimension (shape = (num_edges, 2*num_encoded_node_features+num_encoded_edge_features)), passed through an MLP. Output shape = (num_edges, num_encoded_edge_features)
+        """
         return self.edge_mlp(torch.cat([x_i, x_j, e], dim=-1))
 
     def update(self,
                x_updated: torch.tensor,
                x: torch.tensor,
                e: torch.tensor):
-        print(f"x_updated.shape={x_updated.shape}")
+        """
+        Arguments:
+            x_updated: shape = (num_particles, num_encoded_edge_features)
+            x: shape = (num_particles, num_encoded_node_features)
+            e: shape = (num_edges, num_encoded_edge_features)
+
+        Returns:
+            concatenated [x_updated, x] along the last dimension (shape = (num_particles, num_encoded_node_features+num_encoded_edge_features)), passed through an MLP. Output shape = (num_particles, num_encoded_node_features)
+        """
         return self.node_mlp(torch.cat([x_updated, x], dim=-1)), e
         
 # num_node_features = 10
@@ -179,27 +188,17 @@ class InteractionNetwork(gnn.MessagePassing):
 # print(encoded_e)
 
 torch.manual_seed(42)
-number_particles = 3
+number_particles = 4
 number_edges = 3
 number_embedded_node_features = 12
 number_embedded_edge_features = 7
 num_mlp_layers = 2
 mlp_layer_size = 74
 GN = InteractionNetwork(number_embedded_node_features,number_embedded_edge_features,num_mlp_layers,mlp_layer_size)
-# x = torch.rand(number_particles, number_embedded_node_features)
-# e = torch.rand(number_edges, number_embedded_edge_features)
-x=torch.tensor([[0.4068, 0.6481, 0.7135, 0.1610, 0.5588, 0.3934, 0.0498, 0.5882, 0.6069,
-         0.1175, 0.9703, 0.7622],
-        [0.7843, 0.0643, 0.0680, 0.7160, 0.7887, 0.0712, 0.9801, 0.3898, 0.0946,
-         0.1332, 0.3840, 0.7631],
-        [0.1552, 0.8684, 0.9997, 0.9700, 0.7276, 0.2957, 0.3099, 0.8590, 0.3956,
-         0.5765, 0.9998, 0.0030]])
-e=torch.tensor([[0.3858, 0.3023, 0.4191, 0.5206, 0.3917, 0.9854, 0.7028],
-        [0.1859, 0.9845, 0.3612, 0.5720, 0.5467, 0.1325, 0.7544],
-        [0.1962, 0.0545, 0.9197, 0.7994, 0.2907, 0.1421, 0.9515]])
-
-edge_index = torch.tensor([[0, 0, 1],
-                           [1, 2, 2]])
+x = torch.rand(number_particles, number_embedded_node_features)
+e = torch.rand(number_edges, number_embedded_edge_features)
+edge_index = torch.tensor([[0, 0, 0],
+                           [1, 2, 3]])
 
 print(edge_index.shape)
 print(f"x={x}")
