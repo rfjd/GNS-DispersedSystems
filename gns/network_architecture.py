@@ -333,13 +333,13 @@ class EncoderProcessorDecoder(nn.Module):
 # print(f"x={x}")
 # print(f"e={e}")
 
-num_encoded_node_features = 7
-output_size = 3
-num_mlp_layers = 2
-mlp_layer_size = 64
-num_particles = 5
-decoder = Decoder(num_encoded_node_features, output_size, num_mlp_layers, mlp_layer_size)
-x = torch.rand(num_particles, num_encoded_node_features)
-print(x)
-print("Decode...")
-print(decoder.forward(x))
+# num_encoded_node_features = 7
+# output_size = 3
+# num_mlp_layers = 2
+# mlp_layer_size = 64
+# num_particles = 5
+# decoder = Decoder(num_encoded_node_features, output_size, num_mlp_layers, mlp_layer_size)
+# x = torch.rand(num_particles, num_encoded_node_features)
+# print(x)
+# print("Decode...")
+# print(decoder.forward(x))
