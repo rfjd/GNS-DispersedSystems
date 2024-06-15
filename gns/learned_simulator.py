@@ -49,9 +49,29 @@ class LearnedSimulator(nn.Module):
         pass
 
     def compute_graph_connectivity(self,
-                                   node_locations: torch.tensor,
-                                   number_particles_per_example: torch:tensor):
+                                   particle_locations: torch.tensor,
+                                   num_particles_per_example: torch.tensor,
+                                   add_self_edges: bool = False):
+        """
+        This method generates edges between particles that are within the connectivity_radius of each other.
+
+        Arguments:
+            particle_locations: shape = (num_particles, spatial_dimension)
+            num_particles_per_example: number of particles per example in the batch; we usually have 2 examples per batch. Hence num_particles_per_example = tensor([num_particles_example1, num_particles_example2]).
+            add_self_edges: whether to add self edges (loops) or not
         
+        Returns:
+            receivers and senders of edge_index [edge_index.shape = (2, num_edges)]; the num_edges corresponds to the total number of edges in the batch (i.e., between num_particles). The batch_ids below is used to distinguish between particles from different examples in the batch.
+        """
+        # bacth_ids: tensor containing batch indices for each particle. It's constructed using torch.cat to repeat batch indices based on nparticles_per_example. For instance, if num_particles_per_example = tensor([3,4]), then batch_ids = tensor([0,0,0,1,1,1,1]).
+        batch_ids = torch.cat([torch.LongTensor([i for _ in range(n)]) for i, n in enumerate(num_particles_per_example)]).to(self.device)
+
+        edge_index = gnn.radius_graph(particle_locations, r=self.connectivity_radius, batch=batch_ids, loop=add_self_edges, max_num_neighbors=128)
+
+        receivers = edge_index[0, :]
+        senders = edge_index[1, :]
+
+        return receivers, senders
 
 
 rotation = False
@@ -62,7 +82,7 @@ num_encoded_edge_features = 64
 num_mlp_layers = 2
 mlp_layer_size = 256
 num_message_passing_steps = 5
-connectivity_radius = 0.1
+connectivity_radius = 0.5
 normalization_stats = {'vel': (0.01,0.0001), 'acc': (0.05,0.0005)}
 boundaries = np.array([[0,0],[1,1]])
 
@@ -74,5 +94,14 @@ simulator = LearnedSimulator(num_node_features,
                              normalization_stats,
                              boundaries)
 
+
+num_particles = 10
+particle_locations = torch.rand(num_particles,2)
+num_particles_per_example = torch.tensor([4,6])
+
+
 print(simulator.output_node_size)
 print(simulator.boundaries)
+receivers, senders = simulator.compute_graph_connectivity(particle_locations, num_particles_per_example)
+print(f"receivers: {receivers}")
+print(f"senders: {senders}")
