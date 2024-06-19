@@ -1,5 +1,5 @@
 import torch
-from torch.utils.data import Dataset, DataLoader
+from torch.utils.data import Dataset
 import numpy as np
 
 
@@ -24,6 +24,7 @@ def load_npz_data(file_path):
 
 
 # https://pytorch.org/docs/stable/data.html#torch.utils.data.Dataset
+# https://pytorch.org/tutorials/beginner/data_loading_tutorial.html?highlight=dataset
 # Dataset class for pytorch (mapping style)
 class TrajectoriesDataset(Dataset):
     """
