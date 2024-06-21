@@ -81,8 +81,7 @@ class LearnedSimulator(nn.Module):
     def encoder_preprocessor(self,
                              position_sequence: torch.tensor,
                              num_particles_per_example: torch.tensor,
-                             particle_types: torch.tensor,
-                             material_property: torch.tensor = None):
+                             particle_types: torch.tensor):
         """
         This method encodes the particle positions and types using a sequence of C=6 most recent positions.
 
@@ -90,7 +89,6 @@ class LearnedSimulator(nn.Module):
             position_sequence: tensor of shape (num_particles, C, spatial_dimension)
             num_particles_per_example: tensor of shape (batch_size,) containing the number of particles in each example
             particle_types: tensor of shape (num_particles,) containing the type of each particle
-            material_property: tensor of shape (num_particles,) containing the material property of each particle
 
         Returns:
             node_features: tensor of shape (num_particles, num_node_features)
@@ -105,7 +103,7 @@ class LearnedSimulator(nn.Module):
         ### Encoded node features
         # flattened most recent velocities
         node_features = []
-        velocity_stats = normalization_stats['vel']
+        velocity_stats = self.normalization_stats['vel']
         print(f"velocity_stats: {velocity_stats}")
         normalized_velocities = (last_velocities - velocity_stats["mean"])/velocity_stats["std"] # shape = (num_particles, C-1, spatial_dimension)
         flat_normalized_velocities = normalized_velocities.view(num_particles, -1) # shape = (num_particles, (C-1)*spatial_dimension)
@@ -146,9 +144,52 @@ class LearnedSimulator(nn.Module):
 
         # node_features is a list with element of shape (num_particles, N1), (num_particles, N2), ... . torch.cat(node_features, dim=-1) will concatenate these elements along the last dimension to get a shape of (num_particles, N1+N2+...). A similar scenario holds for edge_features.
         # torch.stack([senders, receivers]) will stack the tensors along the first dimension to get a shape of (2, num_edges).
-        return torch.cat(node_features,dim=-1), torch.stack([senders, receivers]), torch.cat(edge_features, dim=-1)
+        return torch.cat(node_features,dim=-1), torch.cat(edge_features, dim=-1), torch.stack([senders, receivers])
 
-    
+    def decoder_postprocessor(self,
+                              normalized_acceleration: torch.tensor,
+                              position_sequence: torch.tensor):
+        """
+        This internal method computes the predicted positions of the particles given the normalized accelerations and the current positions.
+        Arguments:
+            normalized_acceleration: tensor of shape (num_particles, spatial_dimension)
+            position_sequence: tensor of shape (num_particles, C, spatial_dimension)
+        
+        Returns:
+            predicted_positions: tensor of shape (num_particles, spatial_dimension)
+        """
+        acceleration_stats = self.normalization_stats['acc']
+        acceleration = normalized_acceleration*acceleration_stats['std'] + acceleration_stats['mean']
+        # Use an Euler integrator to go from acceleration to position
+        # RF: NEEDS TO BE FIXED; assumes dt = 1
+        most_recent_position = position_sequence[:, -1, :]
+        most_recent_velocity = position_sequence[:, -1, :] - position_sequence[:, -2, :]
+        new_velocity = most_recent_velocity + acceleration
+        new_position = most_recent_position + new_velocity
+        return new_position
+
+    def predict_position(self,
+                         position_sequence: torch.tensor,
+                         num_particles_per_example: torch.tensor,
+                         particle_types: torch.tensor):
+        """
+        This method predicts the positions of the particles given the current position sequence, the number of particles per example, and the particle types. It performs a full pass of GNN, and calls the internal method decoder_postprocessor at the end to compute the predicted positions.
+        Arguments:
+            position_sequence: tensor of shape (num_particles, C, spatial_dimension)
+            num_particles_per_example: tensor of shape (batch_size,) containing the number of particles in each example
+            particle_types: tensor of shape (num_particles,) containing the type of each particle
+        
+        Returns:
+            predicted_position: tensor of shape (num_particles, spatial_dimension)
+        """
+        node_features, edge_features, edges = self.encoder_preprocessor(position_sequence, num_particles_per_example, particle_types)
+        predicted_normalized_acceleration = self.encoder_processor_decoder(node_features, edge_features, edges)
+        # print(f"predicted_normalized_acceleration: {predicted_normalized_acceleration}")
+        predicted_position = self.decoder_postprocessor(predicted_normalized_acceleration, position_sequence)
+        return predicted_position
+
+
+# Test the LearnedSimulator class
 rotation = False
 num_node_features = 30
 num_edge_feartures = 3
@@ -158,8 +199,8 @@ num_mlp_layers = 2
 mlp_layer_size = 256
 num_message_passing_steps = 5
 connectivity_radius = 0.5
-normalization_stats = {'vel': {'mean': torch.FloatTensor([0.01,0.0001]), 'std': torch.FloatTensor([0.005,0.00005])},
-                       'acc': {'mean': torch.FloatTensor([0.05,0.0005]), 'std': torch.FloatTensor([0.002,0.00002])}}
+normalization_stats = {'vel': {'mean': torch.FloatTensor([0.1,0.02]), 'std': torch.FloatTensor([1,4])},
+                       'acc': {'mean': torch.FloatTensor([0.5,0.04]), 'std': torch.FloatTensor([2,3])}}
 boundaries = np.array([[0,0],[1,1]])
 
 
@@ -184,10 +225,20 @@ print(f"receivers: {receivers}")
 
 
 particle_types = torch.full((num_particles,), 0)
-node_features, edges, edge_features = simulator.encoder_preprocessor(position_sequence, num_particles_per_example, particle_types)
+node_features, edge_features, edges = simulator.encoder_preprocessor(position_sequence, num_particles_per_example, particle_types)
 print(f"node_features: {node_features}")
 print(f"node_features.shape: {node_features.shape}")
 print(f"edges: {edges}")
 print(f"edges.shape: {edges.shape}")
 print(f"edge_features: {edge_features}")
 print(f"edge_features.shape: {edge_features.shape}")
+
+
+normalized_acceleration = torch.rand(num_particles, 2)
+# print(f"normalized_acceleration: {normalized_acceleration}")
+new_position = simulator.decoder_postprocessor(normalized_acceleration, position_sequence)
+print(f"new_position: {new_position}")
+
+
+predicted_position = simulator.predict_position(position_sequence, num_particles_per_example, particle_types)
+print(f"predicted_position: {predicted_position}")
