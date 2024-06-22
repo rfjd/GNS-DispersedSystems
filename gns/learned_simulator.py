@@ -153,7 +153,7 @@ class LearnedSimulator(nn.Module):
         This internal method computes the predicted positions of the particles given the normalized accelerations and the current positions.
         Arguments:
             normalized_acceleration: tensor of shape (num_particles, spatial_dimension)
-            position_sequence: tensor of shape (num_particles, C, spatial_dimension)
+            position_sequence: tensor of shape (num_particles, c>1, spatial_dimension).
         
         Returns:
             predicted_positions: tensor of shape (num_particles, spatial_dimension)
@@ -189,9 +189,57 @@ class LearnedSimulator(nn.Module):
         return predicted_position
 
 
+    def predict_accelerations(self,
+                              next_position: torch.tensor,
+                              position_sequence: torch.tensor,
+                              position_sequence_noise: torch.tensor,
+                              num_particles_per_example: torch.tensor,
+                              particle_types: torch.tensor):
+        """
+        This method predicts the normalized accelerations given the next position (true training data), the current position sequence, and the noisy position sequence.
+        Arguments:
+            next_position: tensor of shape (num_particles, spatial_dimension)
+            position_sequence: tensor of shape (num_particles, C, spatial_dimension)
+            noisy_position_sequence: tensor of shape (num_particles, C, spatial_dimension)
+            num_particles_per_example: tensor of shape (batch_size,) containing the number of particles in each example
+            particle_types: tensor of shape (num_particles,) containing the type of each particle
+        Returns:
+            predicted_normalized_acceleration: predicted normalized acceleration from the noisy position sequence; tensor of shape (num_particles, spatial_dimension)
+            target_normalized_acceleration: predicted normalized acceleration while the velocity if computed noise free; tensor of shape (num_particles, spatial_dimension)
+        """
+        noisy_position_sequence = position_sequence + position_sequence_noise
+        node_features, edge_features, edges = self.encoder_preprocessor(noisy_position_sequence, nparticles_per_example, particle_types)
+        predicted_normalized_acceleration = self.encoder_processor_decoder(node_features, edge_features, edges)
+
+        next_position_adjusted = next_positions + position_sequence_noise[:,-1,:] # ensures that the velocity is being computed noise free; acceleration will still be noisy however.
+        target_normalized_acceleration = self.inverse_decoder_postprocessor(next_position_adjusted, noisy_position_sequence)
+
+        return predicted_normalized_acceleration, target_normalized_acceleration
+
+    def inverse_decoder_postprocessor(self,
+                                      next_position_adjusted: torch.tensor,
+                                      noisy_position_sequence: torch.tensor):
+        """
+        This internal method computes the target normalized acceleration given the adjusted next position and the noisy position sequence. 
+        """
+        previous_position = noisy_position_sequence[:, -1]
+        previous_velocity = previous_position - noisy_position_sequence[:, -2]
+        next_velocity = next_position_adjusted - previous_position
+        acceleration = next_velocity - previous_velocity
+
+        acceleration_stats = self.normalization_stats["acc"]
+        normalized_acceleration = (acceleration - acceleration_stats['mean'])/acceleration_stats['std']
+        return normalized_acceleration
+
+
+
+
+    
+
+    
 # Test the LearnedSimulator class
 rotation = False
-num_node_features = 30
+num_node_features = 30 # C = 6
 num_edge_feartures = 3
 num_encoded_node_features = 128
 num_encoded_edge_features = 64
@@ -213,7 +261,7 @@ simulator = LearnedSimulator(num_node_features,
 
 
 num_particles = 10
-position_sequence = torch.rand(num_particles, 6, 2)
+position_sequence = torch.rand(num_particles, 8, 2)
 num_particles_per_example = torch.tensor([4,6])
 
 
@@ -239,6 +287,25 @@ normalized_acceleration = torch.rand(num_particles, 2)
 new_position = simulator.decoder_postprocessor(normalized_acceleration, position_sequence)
 print(f"new_position: {new_position}")
 
-
-predicted_position = simulator.predict_position(position_sequence, num_particles_per_example, particle_types)
+# Note; you need to pass the last C positions (consistent with the num_node_features) to the predict_position method; this is while any sequence with length > 1 works for the internal method decoder_postprocessor.
+predicted_position = simulator.predict_position(position_sequence[:,-6:,:], num_particles_per_example, particle_types)
 print(f"predicted_position: {predicted_position}")
+
+
+position_sequence_noise = torch.rand(position_sequence.shape)
+next_position = torch.rand(num_particles, 2)
+predicted_normalized_acceleration, target_normalized_acceleration = simulator.predict_accelerations(
+    next_position,
+    position_sequence_noise[:,-6:,:],
+    position_sequence[:,-6:,:],
+    num_particles_per_example,
+    particle_types)
+
+print(f"predicted_normalized_acceleration: {predicted_normalized_acceleration}")
+print(f"target_normalized_acceleration: {target_normalized_acceleration}")
+
+# check if the targeted acceleration gives the true next position; should it? No!
+target_next_positon = simulator.decoder_postprocessor(target_normalized_acceleration, position_sequence[:,-6:,:])
+print(f"next_position: {next_position}")
+print(f"target_next_positon: {target_next_positon}")
+print(f"sequence_noise: {position_sequence_noise[:,-1,:]}")
