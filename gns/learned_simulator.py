@@ -211,7 +211,8 @@ class LearnedSimulator(nn.Module):
         node_features, edge_features, edges = self.encoder_preprocessor(noisy_position_sequence, num_particles_per_example, particle_types)
         predicted_normalized_acceleration = self.encoder_processor_decoder(node_features, edge_features, edges)
 
-        next_position_adjusted = next_position + position_sequence_noise[:,-1,:] # ensures that the velocity is being computed noise free; acceleration will still be noisy however.
+        next_position_adjusted = next_position + position_sequence_noise[:,-1,:] # ensures that the velocity is being computed noise free; acceleration will still be noisy however. An alternative is to let next_position_adjusted = next_positions + position_sequence_noise[:, -1] + (position_sequence_noise[:, -1] - position_sequence_noise[:, -2]), which ensures that the acceleration is noise free.
+
         target_normalized_acceleration = self.inverse_decoder_postprocessor(next_position_adjusted, noisy_position_sequence)
 
         return predicted_normalized_acceleration, target_normalized_acceleration
@@ -222,10 +223,10 @@ class LearnedSimulator(nn.Module):
         """
         This internal method computes the target normalized acceleration given the adjusted next position and the noisy position sequence. 
         """
-        previous_position = noisy_position_sequence[:, -1]
-        previous_velocity = previous_position - noisy_position_sequence[:, -2]
-        next_velocity = next_position_adjusted - previous_position
-        acceleration = next_velocity - previous_velocity
+        last_position = noisy_position_sequence[:, -1]
+        last_velocity = last_position - noisy_position_sequence[:, -2] # this is the noisy velocity
+        next_velocity = next_position_adjusted - last_position # this is the true velocity
+        acceleration = next_velocity - last_velocity # wil include the noise due to last_velocity being noisy
 
         acceleration_stats = self.normalization_stats["acc"]
         normalized_acceleration = (acceleration - acceleration_stats['mean'])/acceleration_stats['std']
