@@ -208,10 +208,10 @@ class LearnedSimulator(nn.Module):
             target_normalized_acceleration: predicted normalized acceleration while the velocity if computed noise free; tensor of shape (num_particles, spatial_dimension)
         """
         noisy_position_sequence = position_sequence + position_sequence_noise
-        node_features, edge_features, edges = self.encoder_preprocessor(noisy_position_sequence, nparticles_per_example, particle_types)
+        node_features, edge_features, edges = self.encoder_preprocessor(noisy_position_sequence, num_particles_per_example, particle_types)
         predicted_normalized_acceleration = self.encoder_processor_decoder(node_features, edge_features, edges)
 
-        next_position_adjusted = next_positions + position_sequence_noise[:,-1,:] # ensures that the velocity is being computed noise free; acceleration will still be noisy however.
+        next_position_adjusted = next_position + position_sequence_noise[:,-1,:] # ensures that the velocity is being computed noise free; acceleration will still be noisy however.
         target_normalized_acceleration = self.inverse_decoder_postprocessor(next_position_adjusted, noisy_position_sequence)
 
         return predicted_normalized_acceleration, target_normalized_acceleration
@@ -294,12 +294,7 @@ print(f"predicted_position: {predicted_position}")
 
 position_sequence_noise = torch.rand(position_sequence.shape)
 next_position = torch.rand(num_particles, 2)
-predicted_normalized_acceleration, target_normalized_acceleration = simulator.predict_accelerations(
-    next_position,
-    position_sequence_noise[:,-6:,:],
-    position_sequence[:,-6:,:],
-    num_particles_per_example,
-    particle_types)
+predicted_normalized_acceleration, target_normalized_acceleration = simulator.predict_accelerations(next_position, position_sequence[:,-6:,:], position_sequence_noise[:,-6:,:], num_particles_per_example, particle_types)
 
 print(f"predicted_normalized_acceleration: {predicted_normalized_acceleration}")
 print(f"target_normalized_acceleration: {target_normalized_acceleration}")
