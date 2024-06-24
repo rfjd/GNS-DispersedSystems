@@ -142,7 +142,8 @@ class LearnedSimulator(nn.Module):
         node_features.append(distance_to_boundaries)
 
         # particle types
-        node_features.append(self.particle_type_embedding(particle_types))
+        if self.number_particle_types > 1:
+            node_features.append(self.particle_type_embedding(particle_types))
 
         """
         num_node_features:
@@ -264,16 +265,10 @@ class LearnedSimulator(nn.Module):
         return normalized_acceleration
 
 
-
-
-    
-
-# # position_sequence = torch.rand(num_particles, 8, 2)
-# # print("Position sequence script1:", position_sequence)
     
 # # Test the LearnedSimulator class
 # rotation = False
-# num_node_features = 18 # C = 6
+# num_node_features = 14 # C = 6
 # num_edge_feartures = 3
 # num_encoded_node_features = 32
 # num_encoded_edge_features = 32
