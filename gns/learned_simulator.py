@@ -15,7 +15,7 @@ import random
 # set_seed(0)
 
 import torch.nn as nn
-import network_architecture
+from gns import network_architecture
 import torch_geometric.nn as gnn
 from typing import Dict, Tuple
 
@@ -121,12 +121,16 @@ class LearnedSimulator(nn.Module):
         num_particles = position_sequence.shape[0]
         current_position = position_sequence[:, -1, :] # last position: shape = (num_particles, spatial_dimension)
         last_velocities = time_diff(position_sequence) # last C-1 velocities: shape = (num_particles, C-1, spatial_dimension)
+        # print(f"position_sequence.device: {position_sequence.device}")
 
         ### Encoded node features
         # flattened most recent velocities
         node_features = []
         velocity_stats = self.normalization_stats['vel']
         # print(f"velocity_stats: {velocity_stats}")
+        # print(f"last_velocities.device={last_velocities.device}")
+        # print(f"velocity_stats['mean'].device={velocity_stats['mean'].device}")
+        # print(f"velocity_stats['std'].device={velocity_stats['std'].device}")
         normalized_velocities = (last_velocities - velocity_stats["mean"])/velocity_stats["std"] # shape = (num_particles, C-1, spatial_dimension)
         flat_normalized_velocities = normalized_velocities.view(num_particles, -1) # shape = (num_particles, (C-1)*spatial_dimension)
 
@@ -263,6 +267,15 @@ class LearnedSimulator(nn.Module):
         acceleration_stats = self.normalization_stats["acc"]
         normalized_acceleration = (acceleration - acceleration_stats['mean'])/acceleration_stats['std']
         return normalized_acceleration
+
+
+    def save(self, path: str = 'model.pt'):
+        torch.save(self.state_dict(), path)
+
+
+    def load(self, path: str):
+        self.load_state_dict(torch.load(path, map_location=torch.device('cpu')))
+
 
 
     
