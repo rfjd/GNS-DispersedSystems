@@ -145,7 +145,7 @@ def get_simulator(metadata: json,
 
     num_node_features = 14
     num_edge_features = 3
-    print(f"CONNECTIVITY_RADIUS: {CONNECTIVITY_RADIUS}")
+    # print(f"CONNECTIVITY_RADIUS: {CONNECTIVITY_RADIUS}")
     simulator = learned_simulator.LearnedSimulator(
         num_node_features=NUM_NODE_FETURES,
         num_edge_features=NUM_EDGE_FEATURES,
@@ -305,10 +305,10 @@ def train(rank, flags, world_size, device):
                                                     input_length_sequence=C,
                                                     batch_size=flags["batch_size"])
 
-    print(f"len(dl.dataset._data) is {len(dl.dataset._data)}") # = 6, number of simulations (examples) in the dataset; dl: data loader; dal.dataset: SamplesDataset
-    print(f"dl.dataset._data[0].shape is {dl.dataset._data[0].shape}")
-    print(f"dl.dataset._data[0][0].shape is {dl.dataset._data[0][0].shape}")
-    print(f"n_features is {len(dl.dataset._data[0])}")
+    # print(f"len(dl.dataset._data) is {len(dl.dataset._data)}") # = 6, number of simulations (examples) in the dataset; dl: data loader; dal.dataset: SamplesDataset
+    # print(f"dl.dataset._data[0].shape is {dl.dataset._data[0].shape}")
+    # print(f"dl.dataset._data[0][0].shape is {dl.dataset._data[0][0].shape}")
+    # print(f"n_features is {len(dl.dataset._data[0])}")
     n_features = len(dl.dataset._data[0]) # Horrible naming! This the size of the Tuple; if =2, it means only particle positions and material type are given. If 3, material property is also given.
 
     COUNTER = 0
@@ -322,12 +322,12 @@ def train(rank, flags, world_size, device):
                 pass
             for example in dl:  # ((position, particle_type, material_property, n_particles_per_example), labels) are in dl
                 COUNTER += 1
-                print(f"counter is {COUNTER}")
-                print(f"inside for example in dl loop") # example here is a list; example[i] is also a list
-                print(f"len(example) is {len(example)}")
-                print(f"example[0][0].shape is {example[0][0].shape}") # (num_particles, 6, DIM) last 6 positions
-                print(f"example[0][1].shape is {example[0][1].shape}") # (num_particles, ) particle type
-                print(f"example[1].shape is {example[1].shape}")
+                # print(f"counter is {COUNTER}")
+                # print(f"inside for example in dl loop") # example here is a list; example[i] is also a list
+                # print(f"len(example) is {len(example)}")
+                # print(f"example[0][0].shape is {example[0][0].shape}") # (num_particles, 6, DIM) last 6 positions
+                # print(f"example[0][1].shape is {example[0][1].shape}") # (num_particles, ) particle type
+                # print(f"example[1].shape is {example[1].shape}")
                 # print(f"example[1] is {example[1]}") # What is this? The second entry of the example list/tuple
                 position = example[0][0].to(device_id)
                 particle_type = example[0][1].to(device_id)
@@ -349,11 +349,11 @@ def train(rank, flags, world_size, device):
                 non_kinematic_mask = (particle_type != KINEMATIC_PARTICLE_ID).clone().detach().to(device_id)
                 sampled_noise *= non_kinematic_mask.view(-1, 1, 1)
 
-                print(f"AOOOOOOOOOOOOOOOOOOOOOOOOOO!")
+                # print(f"AOOOOOOOOOOOOOOOOOOOOOOOOOO!")
                 # Get the predictions and target accelerations.
                 if device == torch.device("cuda"):
-                    print(f"inside the train loop for cuda block")
-                    print(f"nparticles_per_example is {n_particles_per_example}")
+                    # print(f"inside the train loop for cuda block")
+                    # print(f"nparticles_per_example is {n_particles_per_example}")
                     pred_acc, target_acc = simulator.module.predict_acceleration(
                         next_position=labels.to(rank),
                         position_sequence=position.to(rank),
@@ -370,7 +370,7 @@ def train(rank, flags, world_size, device):
                         particle_types=particle_type.to(device)
                     )
 
-                print(f"BABOOOOOOOO")
+                # print(f"BABOOOOOOOO")
                 # Calculate the loss and mask out loss on kinematic particles
                 loss = (pred_acc - target_acc) ** 2
                 loss = loss.sum(dim=-1)
@@ -468,7 +468,7 @@ def main(_):
             train(rank, myflags, world_size, device)
 
     elif FLAGS.mode in ['valid', 'rollout']:
-        print(f"I'm in the valid or rollout block")
+        # print(f"I'm in the valid or rollout block")
         # Set device
         world_size = torch.cuda.device_count()
         if FLAGS.cuda_device_number is not None and torch.cuda.is_available():
