@@ -1,3 +1,6 @@
+from gns import seed_util
+seed_util.apply_seed()
+
 import torch
 from torch.utils.data.distributed import DistributedSampler
 

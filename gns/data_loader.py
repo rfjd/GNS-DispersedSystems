@@ -1,3 +1,6 @@
+from gns import seed_util
+seed_util.apply_seed()
+
 import torch
 import numpy as np
 
@@ -57,7 +60,7 @@ class SamplesDataset(torch.utils.data.Dataset):
         self._dimension = self._data[0][0].shape[-1]
         self._input_length_sequence = input_length_sequence
         self._material_property_as_feature = True if len(self._data[0]) >= 3 else False
-        print(f"_data[0]={len(self._data[0])}")
+        # print(f"_data[0]={len(self._data[0])}")
         if self._material_property_as_feature:  # if raw data includes material_property
             self._data_lengths = [x.shape[0] - self._input_length_sequence for x, _, _ in self._data]
         else:

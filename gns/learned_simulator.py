@@ -1,18 +1,9 @@
+from gns import seed_util
+seed_util.apply_seed()
+
 import torch
 import numpy as np
 import random
-
-# def set_seed(seed):
-#     random.seed(seed)
-#     np.random.seed(seed)
-#     torch.manual_seed(seed)
-#     if torch.cuda.is_available():
-#         torch.cuda.manual_seed(seed)
-#         torch.cuda.manual_seed_all(seed)
-#     torch.backends.cudnn.deterministic = True
-#     torch.backends.cudnn.benchmark = False
-
-# set_seed(0)
 
 import torch.nn as nn
 from gns import network_architecture
@@ -78,7 +69,7 @@ class LearnedSimulator(nn.Module):
     def compute_graph_connectivity(self,
                                    particle_locations: torch.tensor,
                                    num_particles_per_example: torch.tensor,
-                                   add_self_edges: bool = False):
+                                   add_self_edges: bool = True):
         """
         This method generates edges between particles that are within the connectivity_radius of each other.
 
@@ -140,9 +131,10 @@ class LearnedSimulator(nn.Module):
         boundaries = torch.tensor(self.boundaries, requires_grad=False).to(self.device) # converting boundaries from np.ndarray to torch.tensor; shape = (spatial_dimension, 2); boundaries[:,0] and boundaries[:,1] give the coordinates of the low and high corners of the simulation box with shape (spatial_dimension,), respectively.
         distannce_to_lower_boundary = current_position - boundaries[:, 0] # shape = (num_particles, spatial_dimension);
         distannce_to_upper_boundary = boundaries[:, 1] - current_position # shape = (num_particles, spatial_dimension);
+
         distance_to_boundaries = torch.cat([distannce_to_lower_boundary, distannce_to_upper_boundary], dim=-1)/self.connectivity_radius # shape = (num_particles, 2*spatial_dimension); note that distance_to_boundaries is normalized by the connectivity_radius.
         # # clip the distance to boundaries to [0,1], i.e., only consider distances that are less than or equal the connectivity_radius. Note that the distance_to_boundaries is always positive.
-        # distance_to_boundaries = torch.clamp(distance_to_boundaries, max=1) # shape = (num_particles, 2*spatial_dimension)
+        distance_to_boundaries = torch.clamp(distance_to_boundaries, max=1) # shape = (num_particles, 2*spatial_dimension)
         node_features.append(distance_to_boundaries)
 
         # particle types
@@ -238,8 +230,17 @@ class LearnedSimulator(nn.Module):
             predicted_normalized_acceleration: predicted normalized acceleration from the noisy position sequence; tensor of shape (num_particles, spatial_dimension)
             target_normalized_acceleration: predicted normalized acceleration while the velocity if computed noise free; tensor of shape (num_particles, spatial_dimension)
         """
+        # print(f"next_position: {next_position}") #CHECKED
+        # print(f"position_sequence: {position_sequence}") #CHECKED
+        # print(f"position_sequence_noise: {position_sequence_noise}") #CHECKED
+        # print(f"nparticles_per_example: {num_particles_per_example}") #CHECKED
+        # print(f"particle_types: {particle_types}") #CHECKED
         noisy_position_sequence = position_sequence + position_sequence_noise
         node_features, edge_features, edges = self.encoder_preprocessor(noisy_position_sequence, num_particles_per_example, particle_types)
+        # print(f"node_features: {node_features}")
+        # print(f"node_features.shape: {node_features.shape}")
+        # print(f"edge_features: {edge_features}")
+        # print(f"edge_features.shape: {edge_features.shape}")
         predicted_normalized_acceleration = self.encoder_processor_decoder(node_features, edge_features, edges)
 
         next_position_adjusted = next_position + position_sequence_noise[:,-1,:] # ensures that the velocity is being computed noise free; acceleration will still be noisy however. An alternative is to let next_position_adjusted = next_positions + position_sequence_noise[:, -1] + (position_sequence_noise[:, -1] - position_sequence_noise[:, -2]), which ensures that the acceleration is noise free.

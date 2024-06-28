@@ -1,3 +1,6 @@
+from gns import seed_util
+seed_util.initialize_seed(seed=0)
+
 import collections
 import json
 import os
@@ -59,16 +62,17 @@ FLAGS = flags.FLAGS
 # global variables
 ROTATION = False
 C = 6 # input sequence length
-NUM_NODE_FETURES = 30 # C = 6: NUM_NODE_FETURES = (C-1)*2+2*spatial_dimension+PARTICLE_TYPE_EMEDDING_SIZE*(NUM_PARTICLE_TYPES>1)
-NUM_EDGE_FEATURES = 3
-NUM_ENCODED_NODE_FEATURES = 32
-NUM_ENCODED_EDGE_FEATURES = 32
+NUM_ENCODED_NODE_FEATURES = 128
+NUM_ENCODED_EDGE_FEATURES = 128
 NUM_MLP_LAYERS = 2
-MLP_LAYER_SIZE = 64
-NUM_MESSAGE_PASSING_STEPS = 5
-CONNECTIVITY_RADIUS = 0.5
+MLP_LAYER_SIZE = 128
+NUM_MESSAGE_PASSING_STEPS = 10
+# CONNECTIVITY_RADIUS = 1
 NUM_PARTICLE_TYPES = 9
 PARTICLE_TYPE_EMBEDDING_SIZE = 16
+SPATIAL_DIMENSION = 2
+NUM_NODE_FETURES = (C-1)*2+2*SPATIAL_DIMENSION+PARTICLE_TYPE_EMBEDDING_SIZE*(NUM_PARTICLE_TYPES>1) # e.g., C = 6: 5*2+2*2+8 = 30
+NUM_EDGE_FEATURES = 3
 
 KINEMATIC_PARTICLE_ID = 3
 def rollout(simulator: learned_simulator.LearnedSimulator,
@@ -150,7 +154,7 @@ def get_simulator(metadata: json,
         num_node_features=NUM_NODE_FETURES,
         num_edge_features=NUM_EDGE_FEATURES,
         num_message_passing_steps=NUM_MESSAGE_PASSING_STEPS,
-        connectivity_radius=CONNECTIVITY_RADIUS,
+        connectivity_radius=metadata['default_connectivity_radius'],
         normalization_stats=normalization_stats,
         boundaries=np.array(metadata['bounds']),
         num_encoded_node_features=NUM_ENCODED_NODE_FEATURES,
@@ -257,7 +261,8 @@ def train(rank, flags, world_size, device):
         simulator = get_simulator(metadata, flags["noise_std"], flags["noise_std"], device)
         optimizer = torch.optim.Adam(simulator.parameters(), lr=flags["lr_init"] * world_size)
     step = 0
-
+    
+    # print(f"simulator is {simulator}")
     # If model_path does exist and model_file and train_state_file exist continue training.
     if flags["model_file"] is not None:
 
@@ -350,6 +355,7 @@ def train(rank, flags, world_size, device):
                 sampled_noise *= non_kinematic_mask.view(-1, 1, 1)
 
                 # print(f"AOOOOOOOOOOOOOOOOOOOOOOOOOO!")
+                # print(f"sampled_noise is {sampled_noise}")
                 # Get the predictions and target accelerations.
                 if device == torch.device("cuda"):
                     # print(f"inside the train loop for cuda block")
@@ -370,6 +376,8 @@ def train(rank, flags, world_size, device):
                         particle_types=particle_type.to(device)
                     )
 
+                # print(f"pred_acc is {pred_acc}")# NOT THE SAME
+                # print(f"target_acc is {target_acc}")
                 # print(f"BABOOOOOOOO")
                 # Calculate the loss and mask out loss on kinematic particles
                 loss = (pred_acc - target_acc) ** 2

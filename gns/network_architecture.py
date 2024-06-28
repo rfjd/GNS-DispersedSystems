@@ -1,3 +1,6 @@
+from gns import seed_util
+seed_util.apply_seed()
+
 from typing import List
 import torch
 import torch.nn as nn

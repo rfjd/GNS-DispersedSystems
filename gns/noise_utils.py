@@ -1,3 +1,6 @@
+from gns import seed_util
+seed_util.apply_seed()
+
 import torch
 from gns import learned_simulator
 
@@ -24,8 +27,10 @@ def get_random_walk_noise_for_position_sequence(
   velocity_sequence_noise = torch.randn(
       list(velocity_sequence.shape)) * (noise_std_last_step/num_velocities**0.5)
 
+  # velocity_sequence.shape = torch.Size([num_particles, C-1, spatial_dimension])
+  # list(velocity_sequence.shape) = [num_particles, C-1, spatial_dimension]
   # Apply the random walk.
-  velocity_sequence_noise = torch.cumsum(velocity_sequence_noise, dim=1)
+  velocity_sequence_noise = torch.cumsum(velocity_sequence_noise, dim=1) # preserves the shape of velocity_sequence_noise, and performs cumulative summation along the second dimension (time step).
 
   # Integrate the noise in the velocity to the positions, assuming
   # an Euler intergrator and a dt = 1, and adding no noise to the very first
