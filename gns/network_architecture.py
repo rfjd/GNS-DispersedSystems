@@ -74,7 +74,7 @@ class Encoder(nn.Module):
                              [mlp_layer_size for _ in range(num_mlp_layers)],
                              edge_embedding_size)
         self.edge_mlp = nn.Sequential(*edge_mlp,nn.LayerNorm(edge_embedding_size))
-
+        
 
     def forward(self, x: torch.tensor, e: torch.tensor):
         """
@@ -88,6 +88,11 @@ class Encoder(nn.Module):
             node_encode(x): encoded node features
             edge_encode(e): encoded edge features
         """
+        # print(f"=============================================")
+        # print(f"inside the encoder forward method:")
+        # print(f"self.node_mlp={self.node_mlp}")
+        # print(f"self.edge_mlp={self.edge_mlp}")
+        # print(f"=============================================")
         return self.node_mlp(x), self.edge_mlp(e)
 
 
@@ -262,9 +267,21 @@ class EncoderProcessorDecoder(nn.Module):
                 x: torch.tensor,
                 e: torch.tensor,
                 edge_index: torch.tensor):
+        # print(f"inside the encoder processor decoder forward method:")
+        # print(f"initial")
+        # print(f"x={x}")
+        # print(f"e={e}")
         x, e = self.encoder.forward(x, e)
+        # print(f"after encoding")
+        # print(f"x={x}")
+        # print(f"e={e}")
         x, e = self.processor.forward(x, e, edge_index)
+        # print(f"after processing")
+        # print(f"x={x}")
+        # print(f"e={e}")
         x = self.decoder(x)
+        # print(f"after decoding")
+        # print(f"x={x}")
         return x
 
 

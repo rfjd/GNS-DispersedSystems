@@ -1,12 +1,13 @@
 from gns import seed_util
 seed_util.apply_seed()
+from gns import network_architecture
 
 import torch
 import numpy as np
 import random
 
 import torch.nn as nn
-from gns import network_architecture
+
 import torch_geometric.nn as gnn
 from typing import Dict, Tuple
 
@@ -134,7 +135,7 @@ class LearnedSimulator(nn.Module):
 
         distance_to_boundaries = torch.cat([distannce_to_lower_boundary, distannce_to_upper_boundary], dim=-1)/self.connectivity_radius # shape = (num_particles, 2*spatial_dimension); note that distance_to_boundaries is normalized by the connectivity_radius.
         # # clip the distance to boundaries to [0,1], i.e., only consider distances that are less than or equal the connectivity_radius. Note that the distance_to_boundaries is always positive.
-        distance_to_boundaries = torch.clamp(distance_to_boundaries, max=1) # shape = (num_particles, 2*spatial_dimension)
+        distance_to_boundaries = torch.clamp(distance_to_boundaries, -1, 1) # shape = (num_particles, 2*spatial_dimension)
         node_features.append(distance_to_boundaries)
 
         # particle types
@@ -201,14 +202,17 @@ class LearnedSimulator(nn.Module):
         Returns:
             predicted_position: tensor of shape (num_particles, spatial_dimension)
         """
-        # print(f"inside predict_position method:")
+        # print(f"Inside predict_positions")
+        # print(f"position_sequence: {position_sequence}")
         node_features, edge_features, edges = self.encoder_preprocessor(position_sequence, num_particles_per_example, particle_types)
         # print(f"node_features: {node_features}")
         # print(f"edge_features: {edge_features}")
         # print(f"edges: {edges}")
         predicted_normalized_acceleration = self.encoder_processor_decoder(node_features, edge_features, edges)
         # print(f"predicted_normalized_acceleration: {predicted_normalized_acceleration}")
+        # print(f"encoder_processor_decoder: {self.encoder_processor_decoder}")
         predicted_position = self.decoder_postprocessor(predicted_normalized_acceleration, position_sequence)
+        # print(f"predicted_position: {predicted_position}")
         return predicted_position
 
 

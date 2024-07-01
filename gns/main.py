@@ -16,6 +16,7 @@ from tqdm import tqdm
 
 from absl import flags
 from absl import app
+import argparse
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from gns import learned_simulator
@@ -48,6 +49,34 @@ flags.DEFINE_integer('lr_decay_steps', int(5e6), help='Learning rate decay steps
 flags.DEFINE_integer("cuda_device_number", None, help="CUDA device (zero indexed), default is None so default CUDA device will be used.")
 flags.DEFINE_integer("n_gpus", 1, help="The number of GPUs to utilize for training")
 
+FLAGS = flags.FLAGS
+
+# global variables
+flags.DEFINE_boolean('ROTATION', False, 'Whether to use rotation or not')
+flags.DEFINE_integer('C', 6, 'Input sequence length')
+flags.DEFINE_integer('NUM_ENCODED_NODE_FEATURES', 128, 'Number of encoded node features')
+flags.DEFINE_integer('NUM_ENCODED_EDGE_FEATURES', 128, 'Number of encoded edge features')
+flags.DEFINE_integer('NUM_MLP_LAYERS', 2, 'Number of MLP layers')
+flags.DEFINE_integer('MLP_LAYER_SIZE', 128, 'Size of each MLP layer')
+flags.DEFINE_integer('NUM_MESSAGE_PASSING_STEPS', 10, 'Number of message passing steps')
+flags.DEFINE_integer('NUM_PARTICLE_TYPES', 9, 'Number of particle types')
+flags.DEFINE_integer('PARTICLE_TYPE_EMBEDDING_SIZE', 16, 'Size of particle type embedding')
+flags.DEFINE_integer('SPATIAL_DIMENSION', 2, 'Spatial dimension')
+
+FLAGS(sys.argv)
+C = FLAGS.C
+NUM_ENCODED_NODE_FEATURES = FLAGS.NUM_ENCODED_NODE_FEATURES
+NUM_ENCODED_EDGE_FEATURES = FLAGS.NUM_ENCODED_EDGE_FEATURES
+NUM_MLP_LAYERS = FLAGS.NUM_MLP_LAYERS
+MLP_LAYER_SIZE = FLAGS.MLP_LAYER_SIZE
+NUM_MESSAGE_PASSING_STEPS = FLAGS.NUM_MESSAGE_PASSING_STEPS
+NUM_PARTICLE_TYPES = FLAGS.NUM_PARTICLE_TYPES
+PARTICLE_TYPE_EMBEDDING_SIZE = FLAGS.PARTICLE_TYPE_EMBEDDING_SIZE
+SPATIAL_DIMENSION = FLAGS.SPATIAL_DIMENSION
+NUM_NODE_FEATURES = (C-1)*2+2*SPATIAL_DIMENSION+PARTICLE_TYPE_EMBEDDING_SIZE*(NUM_PARTICLE_TYPES>1) # e.g., C = 6: 5*2+2*2+8 = 30
+NUM_EDGE_FEATURES = 3
+
+
 # flags.DEFINE_enum("mode", "train", ["train", "rollout"], "mode to run the code")
 # flags.DEFINE_string("data_path", None, "path to the dataset")
 # flags.DEFINE_string("model_path", None, "path for saving checkpoints of the model")
@@ -56,23 +85,6 @@ flags.DEFINE_integer("n_gpus", 1, help="The number of GPUs to utilize for traini
 # flags.DEFINE_string("output_filename", "rollout", "prefix for the rollout filename")
 # flags.DEFINE_float("noise_std", 1e-3, "std of the added noise")
 
-
-FLAGS = flags.FLAGS
-
-# global variables
-ROTATION = False
-C = 6 # input sequence length
-NUM_ENCODED_NODE_FEATURES = 128
-NUM_ENCODED_EDGE_FEATURES = 128
-NUM_MLP_LAYERS = 2
-MLP_LAYER_SIZE = 128
-NUM_MESSAGE_PASSING_STEPS = 10
-# CONNECTIVITY_RADIUS = 1
-NUM_PARTICLE_TYPES = 9
-PARTICLE_TYPE_EMBEDDING_SIZE = 16
-SPATIAL_DIMENSION = 2
-NUM_NODE_FETURES = (C-1)*2+2*SPATIAL_DIMENSION+PARTICLE_TYPE_EMBEDDING_SIZE*(NUM_PARTICLE_TYPES>1) # e.g., C = 6: 5*2+2*2+8 = 30
-NUM_EDGE_FEATURES = 3
 
 KINEMATIC_PARTICLE_ID = 3
 def rollout(simulator: learned_simulator.LearnedSimulator,
@@ -92,8 +104,11 @@ def rollout(simulator: learned_simulator.LearnedSimulator,
         rollout_dict (dict): dictionary containing the initial sequence, predicted and ground truth rollouts, and particle types
         loss: squared error loss between the predicted and ground truth rollouts
     """
-    # print(f"position_sequence device: {position_sequence.device}")
-    # print(f"particle_types device: {particle_types.device}")
+    # print(f"Inside the rollout function")
+    # print(f"position_sequence: {position_sequence}")
+    # print(f"position_sequence.shape: {position_sequence.shape}")
+    # print(f"num_particles_per_example: {num_particles_per_example}")
+    # print(f"num_steps: {num_steps}")
     ground_truth_positions = position_sequence[:, C:, :]
 
     current_position_sequence = position_sequence[:, :C, :]
@@ -102,13 +117,20 @@ def rollout(simulator: learned_simulator.LearnedSimulator,
         predicted_position = simulator.predict_position(current_position_sequence,
                                                         [num_particles_per_example],
                                                         particle_types) # shape = (num_particles, spatial_dimension)
+        # if step == 500:
+        #     print(f"predicted_position is {predicted_position}")
+        # print(f"predicted_position is {predicted_position}")
         ############# will be removed
         kinematic_mask = (particle_types == KINEMATIC_PARTICLE_ID).clone().detach().to(device)
         next_position_ground_truth = ground_truth_positions[:, step]
+        kinematic_mask = kinematic_mask.bool()[:, None].expand(-1, current_position_sequence.shape[-1])
+        predicted_position = torch.where(kinematic_mask, next_position_ground_truth, predicted_position)
+        # print(f"predicted_position after mask is {predicted_position}")
         #############
         predictions.append(predicted_position)
         current_position_sequence = torch.cat([current_position_sequence[:, 1:, :], predicted_position[:,None,:]], dim=1) # shift the sequence forward by one step; note that the predicted new position is added to the sequence, and not the corresponding ground truth position.
 
+    # print(f"predicted_position is {predicted_position}")
     predictions = torch.stack(predictions, dim=0) # shape = (num_steps, num_particles, spatial_dimension)
 
     ground_truth_positions = ground_truth_positions.permute(1,0,2)# shape = (num_steps, num_particles, spatial_dimension) RF: why permute the ground truvh instead of the predictions?
@@ -147,11 +169,9 @@ def get_simulator(metadata: json,
         'vel': {'mean': torch.FloatTensor(metadata['vel_mean']).to(device),'std': torch.sqrt(torch.FloatTensor(metadata['vel_std'])**2+vel_noise_std**2).to(device)}
     }
 
-    num_node_features = 14
-    num_edge_features = 3
     # print(f"CONNECTIVITY_RADIUS: {CONNECTIVITY_RADIUS}")
     simulator = learned_simulator.LearnedSimulator(
-        num_node_features=NUM_NODE_FETURES,
+        num_node_features=NUM_NODE_FEATURES,
         num_edge_features=NUM_EDGE_FEATURES,
         num_message_passing_steps=NUM_MESSAGE_PASSING_STEPS,
         connectivity_radius=metadata['default_connectivity_radius'],
@@ -177,6 +197,7 @@ def predict(device: str):
     Returns:
     
     """
+    file = open(f"{FLAGS.output_path}/rollout_loss.txt", 'w')
     metadata = reading_utils.read_metadata(FLAGS.data_path)
     simulator = get_simulator(metadata, FLAGS.noise_std, FLAGS.noise_std, device)
     simulator.load(FLAGS.model_path + FLAGS.model_file) # load the pre-trained model; map_location='cpu'
@@ -205,19 +226,23 @@ def predict(device: str):
                                          num_steps,
                                          device)
             
-            
-            
             eval_loss.append(torch.flatten(loss))
-
+            
             rollout_dict['metadata'] = metadata
             rollout_dict['loss'] = loss.mean()
-            print(f"Pedicting example {example_id} with loss {rollout_dict['loss']}")
+            # print(f"loss.shape={loss.shape}")
+            # print(f"loss[10,:]={loss[10,:]}")
+            # print(f"position_sequence.shape={position_sequence.shape}")
+            # print(f"loss={loss.mean()}")
+            print(f"Predicting example {example_id} with loss {rollout_dict['loss']}")
             filename = f'{FLAGS.output_filename}_ex{example_id}.pkl'
             filename = os.path.join(FLAGS.output_path, filename)
             with open(filename, 'wb') as f:
                 pickle.dump(rollout_dict, f)
 
+            file.write(f"{rollout_dict['loss']}\n")
 
+    file.close()
     print(f"Mean loss on rollout prediction: {torch.mean(torch.cat(eval_loss))}")
 
 #### RF: to be modified
@@ -236,6 +261,7 @@ def optimizer_to(optim, device):
                         subparam._grad.data = subparam._grad.data.to(device)
 
 def train(rank, flags, world_size, device):
+    file = open(f"{flags['model_path']}/loss.txt", 'w')
     """Train the model.
 
     Args:
@@ -398,8 +424,9 @@ def train(rank, flags, world_size, device):
                     param['lr'] = lr_new
 
                 if rank == 0 or device == torch.device("cpu"):
-                    print(f'Training step: {step}/{flags["ntraining_steps"]}. Loss: {loss}.', flush=True)
-                    print(f"----------------------------------------")
+                    line = f'Training step: {step}/{flags["ntraining_steps"]}. Loss: {loss}.' 
+                    print(line, flush=True)
+                    file.write(f"{loss}\n")
                     # Save model state
                     if step % flags["nsave_steps"] == 0:
                         if device == torch.device("cpu"):
@@ -434,6 +461,7 @@ def train(rank, flags, world_size, device):
     if torch.cuda.is_available():
         distribute.cleanup()
 
+    file.close()
 
 def main(_):
     """Train or evaluates the model."""
@@ -487,73 +515,3 @@ def main(_):
 
 if __name__ == '__main__':
   app.run(main)
-
-        
-# import torch
-# import numpy as np
-# import random
-
-# def set_seed(seed):
-#     random.seed(seed)
-#     np.random.seed(seed)
-#     torch.manual_seed(seed)
-#     if torch.cuda.is_available():
-#         torch.cuda.manual_seed(seed)
-#         torch.cuda.manual_seed_all(seed)
-#     torch.backends.cudnn.deterministic = True
-#     torch.backends.cudnn.benchmark = False
-
-
-# def main(_):
-    
-#     set_seed(0)
-#     rotation = False
-#     num_node_features = 14 # C = 6
-#     num_edge_feartures = 3
-#     num_encoded_node_features = 32
-#     num_encoded_edge_features = 32
-#     num_mlp_layers = 2
-#     mlp_layer_size = 64
-#     num_message_passing_steps = 5
-#     connectivity_radius = 0.5
-#     normalization_stats = {'vel': {'mean': torch.FloatTensor([0.1,0.02]), 'std': torch.FloatTensor([1,4])},
-#                            'acc': {'mean': torch.FloatTensor([0.5,0.04]), 'std': torch.FloatTensor([2,3])}}
-#     boundaries = np.array([[0,0],[1,1]])
-
-#     simulator = learned_simulator.LearnedSimulator(num_node_features,
-#                                  num_edge_feartures,
-#                                  num_message_passing_steps,
-#                                  connectivity_radius,
-#                                  normalization_stats,
-#                                  boundaries,
-#                                  num_encoded_node_features=num_encoded_node_features,
-#                                  num_encoded_edge_features=num_encoded_edge_features,
-#                                  num_mlp_layers=num_mlp_layers,
-#                                  mlp_layer_size=mlp_layer_size,
-#                                  particle_type_embedding_size=4)
-
-
-#     set_seed(0)
-
-#     num_particles = 7
-#     sequence_length = 30
-#     position_sequence = torch.rand(num_particles, sequence_length, 2)
-#     num_particles_per_example = torch.tensor([4,3])
-#     particle_types = torch.full((num_particles,), 0)
-#     rollout_dict, loss= rollout(simulator,
-#                                 position_sequence,
-#                                 particle_types,
-#                                 num_particles_per_example,
-#                                 sequence_length - C)
-
-#     print(f"Loss.shape: {loss.shape}")
-#     print(f"Loss[0] = {loss[0]}")
-#     print(f"rollout_dict['predicted_rollout'].shape: {rollout_dict['predicted_rollout'].shape}")
-#     print(f"rollout_dict['predicted_rollout'][0] = {rollout_dict['predicted_rollout'][0]}")
-
-
-#     predict('cuda')
-
-
-# if __name__ == '__main__':
-#     app.run(main)
