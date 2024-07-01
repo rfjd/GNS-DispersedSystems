@@ -1,0 +1,130 @@
+\documentclass[letterpaper, 11pt]{article}
+
+\usepackage{enumerate}
+\usepackage{graphicx}
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{amsthm}
+\usepackage{mathrsfs}
+\usepackage{xcolor}
+\usepackage{mathtools}
+\usepackage{hyperref}
+\hypersetup{colorlinks=true,linkcolor=blue,urlcolor=blue,citecolor=blue}
+\renewcommand{\tableautorefname}{Table}
+\renewcommand{\figureautorefname}{Fig.}
+\renewcommand{\sectionautorefname}{Sec.}
+\renewcommand{\subsectionautorefname}{Sec.}
+\renewcommand{\thetable}{\arabic{table}}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% macros
+\newcommand{\Set}[1]{\mathbb{#1}}
+\global\long\def\Greens{\M{\Set G}}
+\renewcommand{\i}{\mathsf{i}}
+\global\long\def\V#1{\boldsymbol{#1}} %vector
+\global\long\def\M#1{\boldsymbol{#1}} %matrix
+\newcommand{\sM}[1]{\M{\mathcal{#1}}} %matrix in mathcal font
+\newcommand{\tp}{^\intercal}
+\newcommand{\ihat}{\V{e}_x}
+\newcommand{\jhat}{\V{e}_y}
+
+
+\global\long\def\norm#1{\left\Vert #1\right\Vert }
+\global\long\def\abs#1{\left|#1\right|}
+
+\global\long\def\grad{\M{\nabla}}
+\global\long\def\av#1{\left\langle #1\right\rangle}
+
+\newcommand{\kT}{k_B T}
+
+\title{Point particles in a 2D box}
+
+\begin{document}
+\date{}
+\maketitle
+\thispagestyle{empty}
+\section{Model}
+\subsection{Governing equations}
+We consider $N$ particles with radius $a$ in a two-dimensional box $x,y\in[0,L]$. The deterministic dynamics of the particles are governed by the Newton's second law
+\begin{subequations}
+\begin{align}
+  m\frac{d\V{v}}{dt}&=-6\pi\eta a\V{v}+\left(\V{F}^{\text{ext}}(\V{x})+\V{F}^{\text{steric}}(\V{x})\right),\\
+  \frac{d\V{x}}{dt}&=\V{v}.
+\end{align}
+\label{eq:equation-motion}%
+\end{subequations}
+Here the symbols stand for the velocity of the particles, $\V{v}=\begin{bmatrix}\V{v}_1,\V{v}_2,\dots\end{bmatrix}^{\tp}\in\Set{R}^{N\times 2}$; position of the particles, $\V{x}=\begin{bmatrix}\V{x}_1,\V{x}_2,\dots\end{bmatrix}^{\tp}\in\Set{R}^{N\times 2}$; vectors of, respectively, external, $\V{F}^{\text{ext}}(\V{x})\in\Set{R}^{N\times 2}$, and Lennard-Jones, $\V{F}^{\text{steric}}(\V{x})\in\Set{R}^{N\times 2}$, forces on the particles; viscosity, $\eta$; time, $t$.
+
+In most practical cases, we would assume an overdamped regime, and drop the inertia term in \eqref{eq:equation-motion} and find a first-order differential equation for $\V{x}$:
+\begin{equation}
+  \frac{d\V{x}}{dt}=\mu\left(\V{F}^{\text{ext}}(\V{x})+\V{F}^{\text{steric}}(\V{x})\right),
+  \label{eq:equation-motion-overdamped}
+\end{equation}
+where $\mu=1/(6\pi\eta a)$ is the mobility of the particles. But for this work, we consider the full system \ref{eq:equation-motion} and account for the acceleration as well. (This is to make it relevant to the available GNS code.)
+
+We suppose that the external forces (e.g., due to an applied electric field) are known as functions of time and space. For the steric interactions, we consider a truncated Lennard-Jones (LJ) potential of the form
+\begin{equation}
+  U^{\text{steric}}(r)=
+  \begin{cases}
+    U_{\text{LJ}}(r_m)+\frac{dU_{\mathrm{LJ}}(r_m)}{dr}(r-r_m) & r\leq r_m,\\
+    U_{\text{LJ}}(r) & r_m<r\leq R,\\
+    0 & r>R,
+  \end{cases}
+  \label{Eq:LJPot}
+\end{equation}
+with
+\begin{equation}
+  U_{\text{LJ}}(r)=4U_0\left(\left(\frac{2a}{r}\right)^{2p}-\left(\frac{2a}{r}\right)^p\right).
+  \label{Eq:LJPot}
+\end{equation}
+The symbols stand for the ion-ion distance, $r$; lower cutoff distance, $r_m$; upper cutoff distance, $R$; and depth of the potential well, $U_0$. The lower cutoff distance $r_m<2a$ determines the maximum repulsive force for a given set of parameters. By regulating the exponent $p$, one can have softer or harder interaction forces. The LJ force on particle $i$ due to particle $j$ is
+\begin{align}
+  \V{F}^{\text{steric}}_{ij}(\V{x})&=-\grad U^{\text{steric}}(r_{ij})=\nonumber\\
+  &\begin{cases}
+    -\frac{1}{r_{ij}}\frac{dU_{\mathrm{LJ}}(r_m)}{dr}\V{x}_{ij} & r_{ij}\leq r_m,\\
+    \frac{4pU_0}{r_{ij}^2}\left(2\left(\frac{2a}{r_{ij}}\right)^{2p}-\left(\frac{2a}{r_{ij}}\right)^p\right)\V{x}_{ij} & r_m<r_{ij}\leq R,\\
+    0 & r_{ij}>R,
+  \end{cases}
+  \label{Eq:LJForce}
+\end{align}
+with $\V{x}_{ij}=\begin{bmatrix}x_i-x_j & y_i-y_j\end{bmatrix}$ and $r_{ij}=\sqrt{x_{ij}^2+y_{ij}^2}$. Accordingly, the total LJ force experienced by particle $i$ is $\sum_{j\neq i}\V{F}^{\text{steric}}_{ij}(\V{x})$.
+
+We cast the equations into a dimensionless form by using $a$, $\sqrt{a/g}$, and $mg$ as the length, time, and force scales, respectively. The dimensionless governing equations become
+\begin{subequations}
+  \begin{align}
+    \frac{d\tilde{\V{v}}}{d\tilde{t}}&=-\tfrac{9}{2}\alpha\tilde{\V{v}}+\tilde{\V{F}}^{\text{ext}}(\tilde{\V{x}})+\tilde{\V{F}}^{\text{steric}}(\tilde{\V{x}}),\\
+    \frac{d\tilde{\V{x}}}{d\tilde{t}}&=\tilde{\V{v}}.
+  \end{align}
+  \label{eq:equation-motion-dimensionless}%
+\end{subequations}
+where the decoration $\sim$ denotes a dimensionless variable and
+\begin{equation}
+  \alpha=\frac{\eta}{\rho_pa^{\tfrac{3}{2}}g^{\tfrac{1}{2}}}.
+  \label{eq:dl-params}
+\end{equation}
+Similarly, the pair interaction force changes to
+\begin{align}
+  \tilde{\V{F}}^{\text{steric}}_{ij}(\tilde{\V{x}})&=\nonumber\\
+  &\begin{cases}
+    -\frac{1}{\tilde{r}_{ij}}\frac{d\tilde{U}_{\mathrm{LJ}}(\tilde{r}_m)}{d\tilde{r}}\tilde{\V{x}}_{ij} & \tilde{r}_{ij}\leq \tilde{r}_m,\\
+    \frac{4p\tilde{U}_0}{\tilde{r}_{ij}^2}\left(2\left(\frac{2}{\tilde{r}_{ij}}\right)^{2p}-\left(\frac{2}{\tilde{r}_{ij}}\right)^p\right)\tilde{\V{x}}_{ij} & \tilde{r}_m<\tilde{r}_{ij}\leq \tilde{R},\\
+    0 & \tilde{r}_{ij}>\tilde{R},
+  \end{cases}
+  \label{Eq:StericForce-dimensionless}
+\end{align}
+where,
+\begin{equation}
+  \frac{d\tilde{U}_{\mathrm{LJ}}(\tilde{r}_m)}{d\tilde{r}}=-\frac{4p\tilde{U}_0}{\tilde{r}_m}\left(2\left(\frac{2}{\tilde{r}_m}\right)^{2p}-\left(\frac{2}{\tilde{r}_m}\right)^p\right).
+\end{equation}
+Finally, $\tilde{U}_0=U_0/(mg)$ and $\tilde{r}_m=r_m/a$.
+
+\subsection{Boundary conditions}
+We impose solid-wall boundary conditions with an energy loss ratio $\gamma\in(0,1]$; i.e., upon each collision to a wall, the kinetic energy of the colliding particle is reduced to $\gamma$ multiplied to its pre-collision value. For simplicity we suppose that this energy loss occurs in both directions equally. Furthermore, the direction of the particle motion after collision is determined by assuming a mirror reflection from the wall. If we denote the velocity vectors before and after collision by $\V{v}$ and $\V{v}'$, respectively, then such a reflection can be expressed as
+\begin{equation}
+  \V{v}'=\sqrt{\gamma}\left[\V{v}-2\left(\V{v}\cdot\hat{\V{n}}\right)\hat{\V{n}}\right],
+\end{equation}
+where $\hat{\V{n}}$ is the normal unit vector pointing into the domain.
+
+\subsection{Numerical Integration}
+We use the Euler method to numerically integrate the equation of motion \eqref{eq:equation-motion-dimensionless}. Of course, we could use a more accurate numerical scheme such as RK4. But note that the main goal here is to generate some trajectories that can be used to train a GNS.
+
+\end{document}
