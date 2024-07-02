@@ -1,5 +1,7 @@
+#######################################################
 import sys
 sys.path.append('../')
+
 import torch
 import numpy as np
 from gns import seed_util
@@ -38,7 +40,7 @@ simulator = learned_simulator.LearnedSimulator(
         device='cpu')
 
 num_particles = 3
-position_sequence = torch.randn(num_particles, C, 2)
+position_sequence = torch.rand(num_particles, C, 2)
 num_particles_per_example = torch.tensor([num_particles])
 particle_types = torch.full((num_particles,), 0)
 
@@ -49,23 +51,44 @@ print(f"edge_features: {edge_features}")
 print(f"edges: {edges}")
 
 # CORRECT ANSWER:
-# node_features: tensor([[-1.0124, -0.4075,  1.3856,  0.0991,  1.0000, -0.3141, -1.0000,  1.0000, -1.1258, -1.1524, -0.2506, -0.4339],
-#                        [-1.5072, -0.4175, -0.5679,  0.1383, -1.0000, -1.0000,  1.0000,  1.0000, -1.1258, -1.1524, -0.2506, -0.4339],
-#                        [ 0.5292,  0.2410, -0.2028,  0.1703, -1.0000, -0.7333,  1.0000,  1.0000, -1.1258, -1.1524, -0.2506, -0.4339]], grad_fn=<CatBackward0>)
+# node_features: tensor([
+# [-0.6502,  0.0182, -0.2495, -0.0579,  0.1249,  0.6321,  0.8751,  0.3679, -1.1258, -1.1524, -0.2506, -0.4339],
+# [ 0.2814,  0.0051, -0.7184, -0.1814,  0.3779,  0.1652,  0.6221,  0.8348, -1.1258, -1.1524, -0.2506, -0.4339],
+# [-0.0747, -0.2263,  0.3216,  0.1041,  0.4866,  0.5121,  0.5134, 0.4879, -1.1258, -1.1524, -0.2506, -0.4339]
+# ], grad_fn=<CatBackward0>)
+# edge_features: tensor([[ 0.0000,  0.0000,  0.0000],
+#         [-0.2530,  0.4669,  0.5311],
+#         [-0.3617,  0.1200,  0.3811],
+#         [ 0.2530, -0.4669,  0.5311],
+#         [ 0.0000,  0.0000,  0.0000],
+#         [-0.1087, -0.3469,  0.3635],
+#         [ 0.3617, -0.1200,  0.3811],
+#         [ 0.1087,  0.3469,  0.3635],
+#         [ 0.0000,  0.0000,  0.0000]])
+# edges: tensor([[0, 0, 0, 1, 1, 1, 2, 2, 2],
+#         [0, 1, 2, 0, 1, 2, 0, 1, 2]])
 
-# edge_features: tensor([[0.0000,  0.0000,  0.0000],[0.0000,  0.0000,  0.0000],[0.0902, -0.2669,  0.2817],[-0.0902,  0.2669,  0.2817],[0.0000,  0.0000,  0.0000]])
-# edges = tensor([[0, 1, 1, 2, 2],[0, 1, 2, 1, 2]])
-                       
 predicted_position = simulator.predict_position(position_sequence, num_particles_per_example, particle_types) # tests encoder_preprocessor and encoder_processor_decoder
 print(predicted_position)
 
 # CORRECT ANSWER:
-# tensor([[ 5.1671, -0.5728],
-#         [ 0.2709, -0.7676],
-#         [ 0.5818, -0.3499]], grad_fn=<AddBackward0>)
+# tensor([[ 1.0823, -0.5449],
+#         [ 0.9331, -1.4266],
+#         [ 2.1165, -0.0080]], grad_fn=<AddBackward0>)
 
 
+#######################################################
 # train and rollout tests
+import sys
+sys.path.append('../')
+
+import torch
+import numpy as np
+from gns import seed_util
+seed_util.initialize_seed(seed=0)
+
+from gns import learned_simulator
+
 import os
 os.chdir("..")
 DATA_PATH="test/sampleDATA/"
