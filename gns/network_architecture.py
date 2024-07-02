@@ -88,11 +88,6 @@ class Encoder(nn.Module):
             node_encode(x): encoded node features
             edge_encode(e): encoded edge features
         """
-        # print(f"=============================================")
-        # print(f"inside the encoder forward method:")
-        # print(f"self.node_mlp={self.node_mlp}")
-        # print(f"self.edge_mlp={self.edge_mlp}")
-        # print(f"=============================================")
         return self.node_mlp(x), self.edge_mlp(e)
 
 
@@ -267,99 +262,9 @@ class EncoderProcessorDecoder(nn.Module):
                 x: torch.tensor,
                 e: torch.tensor,
                 edge_index: torch.tensor):
-        # print(f"inside the encoder processor decoder forward method:")
-        # print(f"initial")
-        # print(f"x={x}")
-        # print(f"e={e}")
         x, e = self.encoder.forward(x, e)
-        # print(f"after encoding")
-        # print(f"x={x}")
-        # print(f"e={e}")
         x, e = self.processor.forward(x, e, edge_index)
-        # print(f"after processing")
-        # print(f"x={x}")
-        # print(f"e={e}")
         x = self.decoder(x)
-        # print(f"after decoding")
-        # print(f"x={x}")
         return x
 
 
-        
-        
-# ### Simple checks
-# num_node_features = 10
-# node_embedding_size = 13
-# num_edge_features = 15
-# edge_embedding_size = 7
-# mlp_layer_size = 128
-# num_mlp_layers = 2
-
-# node_mlp = build_mlp(num_node_features,
-#                 [mlp_layer_size for _ in range(num_mlp_layers)],
-#                 node_embedding_size)
-# print(nn.Sequential(*node_mlp,nn.LayerNorm(node_embedding_size)))
-
-# encoder = Encoder(num_node_features, node_embedding_size, num_edge_features, edge_embedding_size, num_mlp_layers, mlp_layer_size)
-
-# number_particles = 3
-# number_edges = 2
-# x = torch.rand(number_particles, num_node_features)
-# e = torch.rand(number_edges, num_edge_features)
-# encoded_x, encoded_e = encoder.forward(x,e)
-# print(encoded_x)
-# print(encoded_e)
-
-# torch.manual_seed(42)
-# number_particles = 4
-# number_edges = 3
-# number_embedded_node_features = 12
-# number_embedded_edge_features = 7
-# num_mlp_layers = 2
-# mlp_layer_size = 74
-# GN = InteractionNetwork(number_embedded_node_features,number_embedded_edge_features,num_mlp_layers,mlp_layer_size)
-# x = torch.rand(number_particles, number_embedded_node_features)
-# e = torch.rand(number_edges, number_embedded_edge_features)
-# edge_index = torch.tensor([[0, 0, 0],
-#                            [1, 2, 3]])
-
-# print(f"x={x}")
-# print(f"e={e}")
-# print("Message Passing...")
-# x, e = GN.forward(x, e, edge_index)
-# print(f"x={x}")
-# print(f"e={e}")
-
-
-# num_encoded_node_features = 12
-# num_encoded_edge_features = 7
-# num_mlp_layers = 2
-# mlp_layer_size = 74
-# num_message_passing_steps = 5
-# processor = Processor(num_encoded_node_features, num_encoded_edge_features, num_mlp_layers, mlp_layer_size, num_message_passing_steps)
-# print(f"processor.gnn_stacks={processor.gnn_stacks}")
-
-# num_particles = 4
-# num_edges = 3
-# x = torch.rand(num_particles, num_encoded_node_features)
-# e = torch.rand(num_edges, num_encoded_edge_features)
-# edge_index = torch.tensor([[0, 0, 0],
-#                            [1, 2, 3]])
-
-# print(f"x={x}")
-# print(f"e={e}")
-# print("Processor...")
-# x, e = processor.forward(x, e, edge_index)
-# print(f"x={x}")
-# print(f"e={e}")
-
-# num_encoded_node_features = 7
-# output_size = 3
-# num_mlp_layers = 2
-# mlp_layer_size = 64
-# num_particles = 5
-# decoder = Decoder(num_encoded_node_features, output_size, num_mlp_layers, mlp_layer_size)
-# x = torch.rand(num_particles, num_encoded_node_features)
-# print(x)
-# print("Decode...")
-# print(decoder.forward(x))

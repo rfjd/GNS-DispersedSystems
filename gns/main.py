@@ -16,7 +16,6 @@ from tqdm import tqdm
 
 from absl import flags
 from absl import app
-import argparse
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from gns import learned_simulator
@@ -76,15 +75,6 @@ SPATIAL_DIMENSION = FLAGS.SPATIAL_DIMENSION
 NUM_NODE_FEATURES = (C-1)*2+2*SPATIAL_DIMENSION+PARTICLE_TYPE_EMBEDDING_SIZE*(NUM_PARTICLE_TYPES>1) # e.g., C = 6: 5*2+2*2+8 = 30
 NUM_EDGE_FEATURES = 3
 
-
-# flags.DEFINE_enum("mode", "train", ["train", "rollout"], "mode to run the code")
-# flags.DEFINE_string("data_path", None, "path to the dataset")
-# flags.DEFINE_string("model_path", None, "path for saving checkpoints of the model")
-# flags.DEFINE_string("model_file", None, "model filename (.pt) to load")
-# flags.DEFINE_string("output_path", None, "The path for saving outputs")
-# flags.DEFINE_string("output_filename", "rollout", "prefix for the rollout filename")
-# flags.DEFINE_float("noise_std", 1e-3, "std of the added noise")
-
 def rollout(simulator: learned_simulator.LearnedSimulator,
             position_sequence: torch.tensor,
             particle_types: torch.tensor,
@@ -102,11 +92,6 @@ def rollout(simulator: learned_simulator.LearnedSimulator,
         rollout_dict (dict): dictionary containing the initial sequence, predicted and ground truth rollouts, and particle types
         loss: squared error loss between the predicted and ground truth rollouts
     """
-    # print(f"Inside the rollout function")
-    # print(f"position_sequence: {position_sequence}")
-    # print(f"position_sequence.shape: {position_sequence.shape}")
-    # print(f"num_particles_per_example: {num_particles_per_example}")
-    # print(f"num_steps: {num_steps}")
     ground_truth_positions = position_sequence[:, C:, :]
 
     current_position_sequence = position_sequence[:, :C, :]
@@ -115,20 +100,9 @@ def rollout(simulator: learned_simulator.LearnedSimulator,
         predicted_position = simulator.predict_position(current_position_sequence,
                                                         [num_particles_per_example],
                                                         particle_types) # shape = (num_particles, spatial_dimension)
-        # if step == 500:
-        #     print(f"predicted_position is {predicted_position}")
-        # print(f"predicted_position is {predicted_position}")
-        # ############# will be removed
-        # kinematic_mask = (particle_types == KINEMATIC_PARTICLE_ID).clone().detach().to(device)
-        # next_position_ground_truth = ground_truth_positions[:, step]
-        # kinematic_mask = kinematic_mask.bool()[:, None].expand(-1, current_position_sequence.shape[-1])
-        # predicted_position = torch.where(kinematic_mask, next_position_ground_truth, predicted_position)
-        # # print(f"predicted_position after mask is {predicted_position}")
-        # #############
         predictions.append(predicted_position)
         current_position_sequence = torch.cat([current_position_sequence[:, 1:, :], predicted_position[:,None,:]], dim=1) # shift the sequence forward by one step; note that the predicted new position is added to the sequence, and not the corresponding ground truth position.
 
-    # print(f"predicted_position is {predicted_position}")
     predictions = torch.stack(predictions, dim=0) # shape = (num_steps, num_particles, spatial_dimension)
 
     ground_truth_positions = ground_truth_positions.permute(1,0,2)# shape = (num_steps, num_particles, spatial_dimension) RF: why permute the ground truvh instead of the predictions?
@@ -167,7 +141,6 @@ def get_simulator(metadata: json,
         'vel': {'mean': torch.FloatTensor(metadata['vel_mean']).to(device),'std': torch.sqrt(torch.FloatTensor(metadata['vel_std'])**2+vel_noise_std**2).to(device)}
     }
 
-    # print(f"CONNECTIVITY_RADIUS: {CONNECTIVITY_RADIUS}")
     simulator = learned_simulator.LearnedSimulator(
         num_node_features=NUM_NODE_FEATURES,
         num_edge_features=NUM_EDGE_FEATURES,
@@ -191,9 +164,6 @@ def predict(device: str):
     This function loads a learned simulator (trained model) and generates a rollout on validation or test data.
     Arguments:
         device (str): device to run the simulation on ('cpu' or 'cuda')
-    
-    Returns:
-    
     """
     file = open(f"{FLAGS.output_path}/rollout_loss.txt", 'w')
     metadata = reading_utils.read_metadata(FLAGS.data_path)
@@ -228,10 +198,6 @@ def predict(device: str):
             
             rollout_dict['metadata'] = metadata
             rollout_dict['loss'] = loss.mean()
-            # print(f"loss.shape={loss.shape}")
-            # print(f"loss[10,:]={loss[10,:]}")
-            # print(f"position_sequence.shape={position_sequence.shape}")
-            # print(f"loss={loss.mean()}")
             print(f"Predicting example {example_id} with loss {rollout_dict['loss']}")
             filename = f'{FLAGS.output_filename}_ex{example_id}.pkl'
             filename = os.path.join(FLAGS.output_path, filename)
@@ -372,14 +338,8 @@ def train(rank, flags, world_size, device):
                 n_particles_per_example.to(device_id)
                 labels.to(device_id)
 
-                # TODO (jpv): Move noise addition to data_loader
                 # Sample the noise to add to the inputs to the model during training.
                 sampled_noise = noise_utils.get_random_walk_noise_for_position_sequence(position, noise_std_last_step=flags["noise_std"]).to(device_id)
-                # non_kinematic_mask = (particle_type != KINEMATIC_PARTICLE_ID).clone().detach().to(device_id)
-                # sampled_noise *= non_kinematic_mask.view(-1, 1, 1)
-
-                # print(f"AOOOOOOOOOOOOOOOOOOOOOOOOOO!")
-                # print(f"sampled_noise is {sampled_noise}")
                 # Get the predictions and target accelerations.
                 if device == torch.device("cuda"):
                     # print(f"inside the train loop for cuda block")
@@ -400,11 +360,8 @@ def train(rank, flags, world_size, device):
                         particle_types=particle_type.to(device)
                     )
 
-                # print(f"pred_acc is {pred_acc}")# NOT THE SAME
-                # print(f"target_acc is {target_acc}")
-                # print(f"BABOOOOOOOO")
-                # Calculate the loss and mask out loss on kinematic particles
-                loss = (pred_acc - target_acc) ** 2
+                # Calculate the loss and take an average
+                loss = (pred_acc - target_acc)**2
                 loss = loss.sum()/len(loss)
 
                 # Computes the gradient of loss
@@ -498,7 +455,6 @@ def main(_):
             train(rank, myflags, world_size, device)
 
     elif FLAGS.mode in ['valid', 'rollout']:
-        # print(f"I'm in the valid or rollout block")
         # Set device
         world_size = torch.cuda.device_count()
         if FLAGS.cuda_device_number is not None and torch.cuda.is_available():

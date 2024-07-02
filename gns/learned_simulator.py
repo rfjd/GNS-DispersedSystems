@@ -11,18 +11,6 @@ import torch.nn as nn
 import torch_geometric.nn as gnn
 from typing import Dict, Tuple
 
-# # Generate the random tensor
-# num_particles = 1
-# position_sequence = torch.rand(num_particles, 8, 2)
-# print("Position sequence script1:", position_sequence)
-# position_sequence = torch.rand(num_particles, 8, 2)
-# print("Position sequence script1:", position_sequence)
-
-
-# RF: what happened to dt?!
-def time_diff(position_sequence: torch.tensor) -> torch.tensor:
-    return position_sequence[:, 1:] - position_sequence[:, :-1]
-
 class LearnedSimulator(nn.Module):
     """
     The constructor gets the following arguments:
@@ -47,7 +35,6 @@ class LearnedSimulator(nn.Module):
         super().__init__()
         self.connectivity_radius = connectivity_radius
         self.normalization_stats = normalization_stats
-        # print(f"normalization_stats: {normalization_stats}")
         self.boundaries = boundaries
         self.number_particle_types = number_particle_types
 
@@ -86,7 +73,6 @@ class LearnedSimulator(nn.Module):
         batch_ids = torch.cat([torch.LongTensor([i for _ in range(n)]) for i, n in enumerate(num_particles_per_example)]).to(self.device)
 
         edge_index = gnn.radius_graph(particle_locations, r=self.connectivity_radius, batch=batch_ids, loop=add_self_edges, max_num_neighbors=128)
-        # print(f"edge_index_compute_graph_connectivity: {edge_index}")
         receivers = edge_index[0, :]
         senders = edge_index[1, :]
 
@@ -112,18 +98,12 @@ class LearnedSimulator(nn.Module):
         
         num_particles = position_sequence.shape[0]
         current_position = position_sequence[:, -1, :] # last position: shape = (num_particles, spatial_dimension)
-        # print(f"current_position: {current_position}")
-        last_velocities = time_diff(position_sequence) # last C-1 velocities: shape = (num_particles, C-1, spatial_dimension)
-        # print(f"position_sequence.device: {position_sequence.device}")
+        last_velocities = torch.diff(position_sequence, dim=1) # last C-1 velocities: shape = (num_particles, C-1, spatial_dimension)
 
         ### Encoded node features
         # flattened most recent velocities
         node_features = []
         velocity_stats = self.normalization_stats['vel']
-        # print(f"velocity_stats: {velocity_stats}")
-        # print(f"last_velocities.device={last_velocities.device}")
-        # print(f"velocity_stats['mean'].device={velocity_stats['mean'].device}")
-        # print(f"velocity_stats['std'].device={velocity_stats['std'].device}")
         normalized_velocities = (last_velocities - velocity_stats["mean"])/velocity_stats["std"] # shape = (num_particles, C-1, spatial_dimension)
         flat_normalized_velocities = normalized_velocities.view(num_particles, -1) # shape = (num_particles, (C-1)*spatial_dimension)
 
@@ -135,8 +115,7 @@ class LearnedSimulator(nn.Module):
         distannce_to_upper_boundary = boundaries[:, 1] - current_position # shape = (num_particles, spatial_dimension);
 
         distance_to_boundaries = torch.cat([distannce_to_lower_boundary, distannce_to_upper_boundary], dim=-1)/self.connectivity_radius # shape = (num_particles, 2*spatial_dimension); note that distance_to_boundaries is normalized by the connectivity_radius.
-        # # clip the distance to boundaries to [0,1], i.e., only consider distances that are less than or equal the connectivity_radius. Note that the distance_to_boundaries is always positive.
-        
+        # clip the distance to boundaries to [0,1], i.e., only consider distances that are less than or equal the connectivity_radius. Note that the distance_to_boundaries is always positive.
         distance_to_boundaries = torch.clamp(distance_to_boundaries, -1, 1) # shape = (num_particles, 2*spatial_dimension)
         node_features.append(distance_to_boundaries)
 
@@ -204,17 +183,9 @@ class LearnedSimulator(nn.Module):
         Returns:
             predicted_position: tensor of shape (num_particles, spatial_dimension)
         """
-        # print(f"Inside predict_positions")
-        # print(f"position_sequence: {position_sequence}")
         node_features, edge_features, edges = self.encoder_preprocessor(position_sequence, num_particles_per_example, particle_types)
-        # print(f"node_features: {node_features}")
-        # print(f"edge_features: {edge_features}")
-        # print(f"edges: {edges}")
         predicted_normalized_acceleration = self.encoder_processor_decoder(node_features, edge_features, edges)
-        # print(f"predicted_normalized_acceleration: {predicted_normalized_acceleration}")
-        # print(f"encoder_processor_decoder: {self.encoder_processor_decoder}")
         predicted_position = self.decoder_postprocessor(predicted_normalized_acceleration, position_sequence)
-        # print(f"predicted_position: {predicted_position}")
         return predicted_position
 
 
@@ -236,26 +207,11 @@ class LearnedSimulator(nn.Module):
             predicted_normalized_acceleration: predicted normalized acceleration from the noisy position sequence; tensor of shape (num_particles, spatial_dimension)
             target_normalized_acceleration: predicted normalized acceleration while the velocity if computed noise free; tensor of shape (num_particles, spatial_dimension)
         """
-        # print(f"next_position: {next_position}") #CHECKED
-        # print(f"position_sequence: {position_sequence}") #CHECKED
-        # print(f"position_sequence_noise: {position_sequence_noise}") #CHECKED
-        # print(f"nparticles_per_example: {num_particles_per_example}") #CHECKED
-        # print(f"particle_types: {particle_types}") #CHECKED
         noisy_position_sequence = position_sequence + position_sequence_noise
         node_features, edge_features, edges = self.encoder_preprocessor(noisy_position_sequence, num_particles_per_example, particle_types)
-        # print(f"node_features: {node_features}")
-        # print(f"node_features.shape: {node_features.shape}")
-        # print(f"edge_features: {edge_features}")
-        # print(f"edge_features.shape: {edge_features.shape}")
         predicted_normalized_acceleration = self.encoder_processor_decoder(node_features, edge_features, edges)
 
         next_position_adjusted = next_position + position_sequence_noise[:,-1,:] # ensures that the velocity is being computed noise free; acceleration will still be noisy however. An alternative is to let next_position_adjusted = next_positions + position_sequence_noise[:, -1] + (position_sequence_noise[:, -1] - position_sequence_noise[:, -2]), which ensures that the acceleration is noise free.
-        # print(f"======================================")
-        # print(f"inside predict_acceleration method:")
-        # print(f"position_sequence_noise[:,-1]: {position_sequence_noise[:,-1]}")
-        # print(f"next_position: {next_position}")
-        # print(f"next_position_adjusted: {next_position_adjusted}")
-        # print(f"======================================")
         target_normalized_acceleration = self.inverse_decoder_postprocessor(next_position_adjusted, noisy_position_sequence)
 
         return predicted_normalized_acceleration, target_normalized_acceleration
@@ -284,85 +240,3 @@ class LearnedSimulator(nn.Module):
         self.load_state_dict(torch.load(path, map_location=torch.device('cpu')))
 
 
-
-    
-# # Test the LearnedSimulator class
-# rotation = False
-# num_node_features = 14 # C = 6
-# num_edge_feartures = 3
-# num_encoded_node_features = 32
-# num_encoded_edge_features = 32
-# num_mlp_layers = 2
-# mlp_layer_size = 64
-# num_message_passing_steps = 5
-# connectivity_radius = 0.5
-# normalization_stats = {'vel': {'mean': torch.FloatTensor([0.1,0.02]), 'std': torch.FloatTensor([1,4])},
-#                        'acc': {'mean': torch.FloatTensor([0.5,0.04]), 'std': torch.FloatTensor([2,3])}}
-# boundaries = np.array([[0,0],[1,1]])
-                 
-# simulator = LearnedSimulator(num_node_features,
-#                              num_edge_feartures,
-#                              num_message_passing_steps,
-#                              connectivity_radius,
-#                              normalization_stats,
-#                              boundaries,
-#                              num_encoded_node_features=num_encoded_node_features,
-#                              num_encoded_edge_features=num_encoded_edge_features,
-#                              num_mlp_layers=num_mlp_layers,
-#                              mlp_layer_size=mlp_layer_size,
-#                              particle_type_embedding_size=4)
-
-
-# set_seed(0)
-# # position_sequence = torch.rand(num_particles, 8, 2)
-# # print("Position sequence script1:", position_sequence)
-
-# num_particles = 7
-# position_sequence = torch.rand(num_particles, 6, 2)
-# num_particles_per_example = torch.tensor([4,3])
-# print(f"position_sequence: {position_sequence}")
-
-# # print(simulator.output_node_size)
-# print(simulator.boundaries)
-
-# print(f"compute_graph_connectivity test:")
-# receivers, senders = simulator.compute_graph_connectivity(position_sequence[:,-1,:], num_particles_per_example)
-# print(f"senders: {senders}")
-# print(f"receivers: {receivers}")
-
-# print(f"encoder_preprocessor test:")
-# particle_types = torch.full((num_particles,), 0)
-# node_features, edge_features, edges = simulator.encoder_preprocessor(position_sequence, num_particles_per_example, particle_types)
-# print(f"node_features: {node_features}")
-# print(f"node_features.shape: {node_features.shape}")
-# print(f"edges: {edges}")
-# print(f"edges.shape: {edges.shape}")
-# print(f"edge_features: {edge_features}")
-# print(f"edge_features.shape: {edge_features.shape}")
-
-
-# normalized_acceleration = torch.rand(num_particles, 2)
-# print(f"normalized_acceleration: {normalized_acceleration}")
-# new_position = simulator.decoder_postprocessor(normalized_acceleration, position_sequence)
-# print(f"new_position: {new_position}")
-
-# # Note; you need to pass the last C positions (consistent with the num_node_features) to the predict_position method; this is while any sequence with length > 1 works for the internal method decoder_postprocessor.
-# predicted_position = simulator.predict_position(position_sequence[:,-6:,:], num_particles_per_example, particle_types)
-# print(f"predicted_position: {predicted_position}")
-
-# print(simulator.encoder_processor_decoder)
-
-# position_sequence_noise = torch.rand(position_sequence.shape)
-# print(f"position_sequence_noise[:,-1]: {position_sequence_noise[:,-1,:]}")
-# next_position = torch.rand(num_particles, 2)
-# predicted_normalized_acceleration, target_normalized_acceleration = simulator.predict_acceleration(next_position, position_sequence[:,-6:,:], position_sequence_noise[:,-6:,:], num_particles_per_example, particle_types)
-# print(f"predicted_normalized_acceleration: {predicted_normalized_acceleration}")
-# print(f"target_normalized_acceleration: {target_normalized_acceleration}")
-
-# # check if the targeted acceleration gives the true next position; should it? No!
-# target_next_positon = simulator.decoder_postprocessor(target_normalized_acceleration, position_sequence[:,-6:,:])
-# print(f"next_position: {next_position}")
-# print(f"target_next_positon: {target_next_positon}")
-
-# seed = torch.initial_seed()
-# print(f"Torch seed: {seed}")
