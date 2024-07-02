@@ -1,4 +1,7 @@
 #######################################################
+"""
+These tests are for develpmental purposes only. There are hardcoded values that are expected to be returned by the functions. These values are taken from an alternative gns implementation at https://github.com/geoelements/gns. Our code, only at its early stage mimics the functionality of that implementation. Actual tests can be found in tests.py.
+"""
 import sys
 sys.path.append('../')
 
