@@ -112,6 +112,7 @@ class LearnedSimulator(nn.Module):
         
         num_particles = position_sequence.shape[0]
         current_position = position_sequence[:, -1, :] # last position: shape = (num_particles, spatial_dimension)
+        # print(f"current_position: {current_position}")
         last_velocities = time_diff(position_sequence) # last C-1 velocities: shape = (num_particles, C-1, spatial_dimension)
         # print(f"position_sequence.device: {position_sequence.device}")
 
@@ -135,10 +136,8 @@ class LearnedSimulator(nn.Module):
 
         distance_to_boundaries = torch.cat([distannce_to_lower_boundary, distannce_to_upper_boundary], dim=-1)/self.connectivity_radius # shape = (num_particles, 2*spatial_dimension); note that distance_to_boundaries is normalized by the connectivity_radius.
         # # clip the distance to boundaries to [0,1], i.e., only consider distances that are less than or equal the connectivity_radius. Note that the distance_to_boundaries is always positive.
-        # print(f"current_position: {current_position}")
-        # print(f"boundaries: {boundaries}")
-        # print(f"distance_to_boundaries: {distance_to_boundaries}")
-        distance_to_boundaries = torch.clamp(distance_to_boundaries, max=1) # shape = (num_particles, 2*spatial_dimension)
+        
+        distance_to_boundaries = torch.clamp(distance_to_boundaries, -1, 1) # shape = (num_particles, 2*spatial_dimension)
         node_features.append(distance_to_boundaries)
 
         # particle types
