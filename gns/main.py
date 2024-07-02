@@ -85,8 +85,6 @@ NUM_EDGE_FEATURES = 3
 # flags.DEFINE_string("output_filename", "rollout", "prefix for the rollout filename")
 # flags.DEFINE_float("noise_std", 1e-3, "std of the added noise")
 
-
-KINEMATIC_PARTICLE_ID = 3
 def rollout(simulator: learned_simulator.LearnedSimulator,
             position_sequence: torch.tensor,
             particle_types: torch.tensor,
@@ -120,13 +118,13 @@ def rollout(simulator: learned_simulator.LearnedSimulator,
         # if step == 500:
         #     print(f"predicted_position is {predicted_position}")
         # print(f"predicted_position is {predicted_position}")
-        ############# will be removed
-        kinematic_mask = (particle_types == KINEMATIC_PARTICLE_ID).clone().detach().to(device)
-        next_position_ground_truth = ground_truth_positions[:, step]
-        kinematic_mask = kinematic_mask.bool()[:, None].expand(-1, current_position_sequence.shape[-1])
-        predicted_position = torch.where(kinematic_mask, next_position_ground_truth, predicted_position)
-        # print(f"predicted_position after mask is {predicted_position}")
-        #############
+        # ############# will be removed
+        # kinematic_mask = (particle_types == KINEMATIC_PARTICLE_ID).clone().detach().to(device)
+        # next_position_ground_truth = ground_truth_positions[:, step]
+        # kinematic_mask = kinematic_mask.bool()[:, None].expand(-1, current_position_sequence.shape[-1])
+        # predicted_position = torch.where(kinematic_mask, next_position_ground_truth, predicted_position)
+        # # print(f"predicted_position after mask is {predicted_position}")
+        # #############
         predictions.append(predicted_position)
         current_position_sequence = torch.cat([current_position_sequence[:, 1:, :], predicted_position[:,None,:]], dim=1) # shift the sequence forward by one step; note that the predicted new position is added to the sequence, and not the corresponding ground truth position.
 
@@ -377,8 +375,8 @@ def train(rank, flags, world_size, device):
                 # TODO (jpv): Move noise addition to data_loader
                 # Sample the noise to add to the inputs to the model during training.
                 sampled_noise = noise_utils.get_random_walk_noise_for_position_sequence(position, noise_std_last_step=flags["noise_std"]).to(device_id)
-                non_kinematic_mask = (particle_type != KINEMATIC_PARTICLE_ID).clone().detach().to(device_id)
-                sampled_noise *= non_kinematic_mask.view(-1, 1, 1)
+                # non_kinematic_mask = (particle_type != KINEMATIC_PARTICLE_ID).clone().detach().to(device_id)
+                # sampled_noise *= non_kinematic_mask.view(-1, 1, 1)
 
                 # print(f"AOOOOOOOOOOOOOOOOOOOOOOOOOO!")
                 # print(f"sampled_noise is {sampled_noise}")
@@ -407,11 +405,7 @@ def train(rank, flags, world_size, device):
                 # print(f"BABOOOOOOOO")
                 # Calculate the loss and mask out loss on kinematic particles
                 loss = (pred_acc - target_acc) ** 2
-                loss = loss.sum(dim=-1)
-                num_non_kinematic = non_kinematic_mask.sum()
-                loss = torch.where(non_kinematic_mask.bool(),
-                                   loss, torch.zeros_like(loss))
-                loss = loss.sum() / num_non_kinematic
+                loss = loss.sum()/len(loss)
 
                 # Computes the gradient of loss
                 optimizer.zero_grad()
