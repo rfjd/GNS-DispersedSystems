@@ -119,9 +119,9 @@ class LearnedSimulator(nn.Module):
         distance_to_boundaries = torch.clamp(distance_to_boundaries, -1, 1) # shape = (num_particles, 2*spatial_dimension)
         node_features.append(distance_to_boundaries)
 
-        # particle types
-        if self.number_particle_types > 1:
-            node_features.append(self.particle_type_embedding(particle_types))
+        # # particle types
+        # if self.number_particle_types > 1:
+        #     node_features.append(self.particle_type_embedding(particle_types))
 
         """
         num_node_features:
