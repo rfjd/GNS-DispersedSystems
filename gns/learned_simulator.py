@@ -130,6 +130,9 @@ class LearnedSimulator(nn.Module):
         
         node_features.append(distance_to_boundaries)
 
+        if self.use_particle_properties:
+            node_features.append(particle_radii)
+        
         """
         num_node_features:
             rotation = False: (C-1)*spatial_dimension + 2*spatial_dimension

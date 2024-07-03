@@ -20,12 +20,14 @@ MLP_LAYER_SIZE = 16
 NUM_MESSAGE_PASSING_STEPS = 10
 CONNECTIVITY_RADIUS = 1
 SPATIAL_DIMENSION = 2
-NUM_NODE_FETURES = (C-1)*2+2*SPATIAL_DIMENSION # e.g., C = 6: 5*2+2*2 = 14
+USE_PARTICLE_PROPERTIES = False
+NUM_NODE_FETURES = (C-1)*2+2*SPATIAL_DIMENSION+1*(USE_PARTICLE_PROPERTIES) # e.g., C = 6: 5*2+2*2 = 15
+print(NUM_NODE_FETURES)
 NUM_EDGE_FEATURES = 3
 normalization_stats = {'vel': {'mean': torch.FloatTensor([0.1,0.02]), 'std': torch.FloatTensor([1,4])},
                        'acc': {'mean': torch.FloatTensor([0.5,0.04]), 'std': torch.FloatTensor([2,3])}}
 
-USE_PARTICLE_PROPERTIES = False
+
 simulator = learned_simulator.LearnedSimulator(
     num_node_features=NUM_NODE_FETURES,
     num_edge_features=NUM_EDGE_FEATURES,
