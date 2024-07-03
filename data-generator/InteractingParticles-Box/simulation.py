@@ -125,7 +125,8 @@ for tr in range(num_trajectories):
     t = np.linspace(0,tf,tM);
     position = np.zeros((tM,DIM[0],DIM[1]))
     position[0,:,:] = x
-    particle_type = np.full((N,),5,dtype=np.int32)
+    radius = a/L
+    particle_properties = np.full((N,), radius)
 
     for n in range(tM-1):
         # Time marching
@@ -187,7 +188,7 @@ for tr in range(num_trajectories):
     
     data_tuple = np.empty(2, dtype=object)
     data_tuple[0] = position/L # normalized
-    data_tuple[1] = particle_type
+    data_tuple[1] = particle_properties
     np.save(f"{data_category}{tr}.npy", data_tuple)
 
 
@@ -235,12 +236,18 @@ if data_category == 'train':
     acc_std = np.mean(acc_std_vec**2+(acc_mean_vec-acc_mean)**2, axis=0)
 
     import json
+    data = np.load('train.npz', allow_pickle=True)
+    radii = []
+    for example in range(len(data.files)):
+        radii.append(data[f'simulation_trajectory_{example}'][1])
 
+    max_radius = np.max(np.concatenate(radii))
+    default_connectivity_radius = 4*max_radius
     # Define the metadata dictionary
     metadata = {
         "bounds": [[-1, 1], [-1, 1]],
         "sequence_length": num_steps,
-        "default_connectivity_radius": 2*R/L,
+        "default_connectivity_radius": default_connectivity_radius,
         "dim": 2,
         "dt": dt,
         "vel_mean": vel_mean.tolist(),
