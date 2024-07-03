@@ -135,8 +135,8 @@ class LearnedSimulator(nn.Module):
         
         """
         num_node_features:
-            rotation = False: (C-1)*spatial_dimension + 2*spatial_dimension
-            rotation = True: (C-1)*spatial_dimension + 2*spatial_dimension + ...
+            rotation = False: (C-1)*spatial_dimension + 2*spatial_dimension+ 1
+            rotation = True: (C-1)*spatial_dimension + 2*spatial_dimension + 1 ...
         RF: interestingly, so as of now, this method should create node features with the same size as the input node features. There should be a better way to do this!
         """
         
