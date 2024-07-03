@@ -101,7 +101,7 @@ class SamplesDataset(torch.utils.data.Dataset):
         # Prepare training data.
         positions = self._data[trajectory_idx][0][time_idx - self._input_length_sequence:time_idx]
         positions = np.transpose(positions, (1, 0, 2))  # nparticles, input_sequence_length, dimension
-        particle_type = np.full(positions.shape[0], self._data[trajectory_idx][1], dtype=int)
+        particle_type = np.full(positions.shape[0], self._data[trajectory_idx][1], dtype=np.float32)
         n_particles_per_example = positions.shape[0]
         label = self._data[trajectory_idx][0][time_idx]
 
@@ -208,7 +208,7 @@ class TrajectoriesDataset(torch.utils.data.Dataset):
         if self._material_property_as_feature:
             positions, _particle_type, _material_property = self._data[idx]
             positions = np.transpose(positions, (1, 0, 2))
-            particle_type = np.full(positions.shape[0], _particle_type, dtype=int)
+            particle_type = np.full(positions.shape[0], _particle_type, dtype=np.float32)
             material_property = np.full(positions.shape[0], _material_property, dtype=float)
             n_particles_per_example = positions.shape[0]
 
@@ -221,7 +221,7 @@ class TrajectoriesDataset(torch.utils.data.Dataset):
         else:
             positions, _particle_type = self._data[idx]
             positions = np.transpose(positions, (1, 0, 2))
-            particle_type = np.full(positions.shape[0], _particle_type, dtype=int)
+            particle_type = np.full(positions.shape[0], _particle_type, dtype=np.float32)
             n_particles_per_example = positions.shape[0]
 
             trajectory = (
