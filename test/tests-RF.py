@@ -19,8 +19,6 @@ NUM_MLP_LAYERS = 2
 MLP_LAYER_SIZE = 16
 NUM_MESSAGE_PASSING_STEPS = 10
 CONNECTIVITY_RADIUS = 1
-NUM_PARTICLE_TYPES = 9
-PARTICLE_TYPE_EMBEDDING_SIZE = 4
 SPATIAL_DIMENSION = 2
 NUM_NODE_FETURES = (C-1)*2+2*SPATIAL_DIMENSION #(C-1)*2+2*SPATIAL_DIMENSION+PARTICLE_TYPE_EMBEDDING_SIZE*(NUM_PARTICLE_TYPES>1) # e.g., C = 6: 5*2+2*2+8 = 30
 NUM_EDGE_FEATURES = 3
@@ -38,8 +36,6 @@ simulator = learned_simulator.LearnedSimulator(
         num_encoded_edge_features=NUM_ENCODED_EDGE_FEATURES,
         num_mlp_layers=NUM_MLP_LAYERS,
         mlp_layer_size=MLP_LAYER_SIZE,
-        number_particle_types=NUM_PARTICLE_TYPES,
-        particle_type_embedding_size=PARTICLE_TYPE_EMBEDDING_SIZE,
         device='cpu')
 
 num_particles = 3
@@ -54,28 +50,30 @@ print(f"edges: {edges}")
 
 # CORRECT ANSWER:
 # node_features: tensor([
-#         [-0.3025,  0.1241, -0.1016, -0.0535,  0.1457,  0.7009,  0.8543,  0.2991],
-#         [ 0.2927, -0.0116, -0.5408,  0.1663,  0.3968,  0.8576,  0.6032,  0.1424],
-#         [-0.2223, -0.0584, -0.7056, -0.0986,  0.1002,  0.3788,  0.8998,  0.6212]])
-# edge_features: tensor([[ 0.0000,  0.0000,  0.0000],
-#         [-0.2512, -0.1567,  0.2960],
-#         [ 0.0455,  0.3220,  0.3252],
-#         [ 0.2512,  0.1567,  0.2960],
-#         [ 0.0000,  0.0000,  0.0000],
-#         [ 0.2966,  0.4787,  0.5632],
-#         [-0.0455, -0.3220,  0.3252],
-#         [-0.2966, -0.4787,  0.5632],
-#         [ 0.0000,  0.0000,  0.0000]])
-# edges: tensor([[0, 0, 0, 1, 1, 1, 2, 2, 2],
-#         [0, 1, 2, 0, 1, 2, 0, 1, 2]])
+#     [ 0.1534,  0.1429,  0.2520, -0.0219,  0.9023,  0.7617,  0.0977,  0.2383],
+#     [ 0.5998,  0.0581, -0.6701, -0.0936,  0.3242,  0.3931,  0.6758,  0.6069],
+#     [-0.0687, -0.0890, -0.2022,  0.0354,  0.7832,  0.7705,  0.2168,  0.2295]])
+# edge_features: tensor([
+#     [ 0.0000,  0.0000,  0.0000],
+#     [ 0.5782,  0.3686,  0.6857],
+#     [ 0.1192, -0.0088,  0.1195],
+#     [-0.5782, -0.3686,  0.6857],
+#     [ 0.0000,  0.0000,  0.0000],
+#     [-0.4590, -0.3774,  0.5942],
+#     [-0.1192,  0.0088,  0.1195],
+#     [ 0.4590,  0.3774,  0.5942],
+#     [ 0.0000,  0.0000,  0.0000]])
+# edges: tensor([
+#     [0, 0, 0, 1, 1, 1, 2, 2, 2],
+#     [0, 1, 2, 0, 1, 2, 0, 1, 2]])
 
 predicted_position = simulator.predict_position(position_sequence, num_particles_per_example, particle_types) # tests encoder_preprocessor and encoder_processor_decoder
 print(predicted_position)
 
 # CORRECT ANSWER:
-# tensor([[ 0.4564,  0.4120],
-#         [ 0.2455,  1.5968],
-#         [-0.1927, -0.1386]], grad_fn=<AddBackward0>)
+# tensor([[1.9101, 2.0501],
+#         [0.1099, 1.7092],
+#         [1.3443, 2.2427]], grad_fn=<AddBackward0>)
 
 
 #######################################################
@@ -107,10 +105,8 @@ NUM_ENCODED_EDGE_FEATURES = 128
 NUM_MLP_LAYERS = 2
 MLP_LAYER_SIZE = 128
 NUM_MESSAGE_PASSING_STEPS = 10
-NUM_PARTICLE_TYPES = 9
-PARTICLE_TYPE_EMBEDDING_SIZE = 16
 
-FLAGS = f"--C={C} --NUM_ENCODED_NODE_FEATURES={NUM_ENCODED_NODE_FEATURES} --NUM_ENCODED_EDGE_FEATURES={NUM_ENCODED_EDGE_FEATURES} --NUM_MLP_LAYERS={NUM_MLP_LAYERS} --MLP_LAYER_SIZE={MLP_LAYER_SIZE} --NUM_MESSAGE_PASSING_STEPS={NUM_MESSAGE_PASSING_STEPS} --NUM_PARTICLE_TYPES={NUM_PARTICLE_TYPES} --PARTICLE_TYPE_EMBEDDING_SIZE={PARTICLE_TYPE_EMBEDDING_SIZE}"
+FLAGS = f"--C={C} --NUM_ENCODED_NODE_FEATURES={NUM_ENCODED_NODE_FEATURES} --NUM_ENCODED_EDGE_FEATURES={NUM_ENCODED_EDGE_FEATURES} --NUM_MLP_LAYERS={NUM_MLP_LAYERS} --MLP_LAYER_SIZE={MLP_LAYER_SIZE} --NUM_MESSAGE_PASSING_STEPS={NUM_MESSAGE_PASSING_STEPS}"
 
 # Train
 os.system(f"python3 -m gns.main --data_path={DATA_PATH} --model_path={MODEL_PATH} --ntraining_steps={number_steps} " + FLAGS)
@@ -121,21 +117,21 @@ os.system(f"python3 -m gns.main --mode=rollout --data_path={DATA_PATH} --model_p
 # Expected output:
 
 # Loss:
-# 3503.91357421875
-# 2547.35107421875
-# 2566.610107421875
-# Loss: 2321.4375
-# 1680.4036865234375
-# 3924.21044921875
-# 2944.2734375
-# 2414.891845703125
-# 1973.1336669921875
-# 3627.047607421875
-# 2706.091552734375
+# 3517.70849609375
+# 2532.505126953125.
+# 2587.94091796875.
+# 2318.3408203125.
+# 1665.0546875.
+# 3879.59716796875.
+# 2926.023681640625.
+# 2424.763427734375.
+# 1957.2808837890625.
+# 3620.72900390625.
+# 2703.468994140625.
 
 # Rollout Prediction Loss:
-# 1251.09130859375
-# 1117.198974609375
+# 998.7435913085938
+# 908.07470703125
 
 ## cleanup
 os.system(f"rm {MODEL_PATH}model-* {MODEL_PATH}train_state-* {ROLLOUT_PATH}rollout_ex*")

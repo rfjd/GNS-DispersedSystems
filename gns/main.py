@@ -58,8 +58,6 @@ flags.DEFINE_integer('NUM_ENCODED_EDGE_FEATURES', 128, 'Number of encoded edge f
 flags.DEFINE_integer('NUM_MLP_LAYERS', 2, 'Number of MLP layers')
 flags.DEFINE_integer('MLP_LAYER_SIZE', 128, 'Size of each MLP layer')
 flags.DEFINE_integer('NUM_MESSAGE_PASSING_STEPS', 10, 'Number of message passing steps')
-flags.DEFINE_integer('NUM_PARTICLE_TYPES', 9, 'Number of particle types')
-flags.DEFINE_integer('PARTICLE_TYPE_EMBEDDING_SIZE', 16, 'Size of particle type embedding')
 flags.DEFINE_integer('SPATIAL_DIMENSION', 2, 'Spatial dimension')
 
 FLAGS(sys.argv)
@@ -69,8 +67,6 @@ NUM_ENCODED_EDGE_FEATURES = FLAGS.NUM_ENCODED_EDGE_FEATURES
 NUM_MLP_LAYERS = FLAGS.NUM_MLP_LAYERS
 MLP_LAYER_SIZE = FLAGS.MLP_LAYER_SIZE
 NUM_MESSAGE_PASSING_STEPS = FLAGS.NUM_MESSAGE_PASSING_STEPS
-NUM_PARTICLE_TYPES = FLAGS.NUM_PARTICLE_TYPES
-PARTICLE_TYPE_EMBEDDING_SIZE = FLAGS.PARTICLE_TYPE_EMBEDDING_SIZE
 SPATIAL_DIMENSION = FLAGS.SPATIAL_DIMENSION
 NUM_NODE_FEATURES = (C-1)*2+2*SPATIAL_DIMENSION # (C-1)*2+2*SPATIAL_DIMENSION+PARTICLE_TYPE_EMBEDDING_SIZE*(NUM_PARTICLE_TYPES>1) # e.g., C = 6: 5*2+2*2+8 = 30
 NUM_EDGE_FEATURES = 3
@@ -152,8 +148,6 @@ def get_simulator(metadata: json,
         num_encoded_edge_features=NUM_ENCODED_EDGE_FEATURES,
         num_mlp_layers=NUM_MLP_LAYERS,
         mlp_layer_size=MLP_LAYER_SIZE,
-        number_particle_types=NUM_PARTICLE_TYPES,
-        particle_type_embedding_size=PARTICLE_TYPE_EMBEDDING_SIZE,
         device=device)
 
     return simulator

@@ -29,16 +29,12 @@ class LearnedSimulator(nn.Module):
                  num_encoded_edge_features: int = 128,
                  num_mlp_layers: int = 2,
                  mlp_layer_size: int = 128,
-                 number_particle_types: int = 1,
-                 particle_type_embedding_size: int = 16,
                  device="cpu"):
         super().__init__()
         self.connectivity_radius = connectivity_radius
         self.normalization_stats = normalization_stats
         self.boundaries = boundaries
-        self.number_particle_types = number_particle_types
 
-        self.particle_type_embedding = nn.Embedding(number_particle_types, particle_type_embedding_size)
         self.output_node_size = spatial_dimension + 1 if rotation else spatial_dimension
         self.encoder_processor_decoder = network_architecture.EncoderProcessorDecoder(
             num_node_features,
