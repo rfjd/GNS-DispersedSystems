@@ -9,24 +9,33 @@ def generate_data(mode):
     num_examples = 2
     num_particles_per_example = np.random.randint(5, 10, (num_examples,))
     num_time_steps = 100
+    a = 0.1 # radius of the particles
     for example in range(num_examples):
         data_tuple = np.empty(2, dtype=object)
         num_particles = num_particles_per_example[example]
         position = np.random.rand(num_time_steps, num_particles, spatial_dimension)
-        particle_type = np.full((num_particles,),0,dtype=np.int32)
+        particle_properties = np.full((num_particles,), a)
         data_tuple[0] = position
-        data_tuple[1] = particle_type
+        data_tuple[1] = particle_properties
 
         data_dict[f"simulation_trajectory_{example}"] = data_tuple
 
     np.savez(f"{mode}.npz", **data_dict)
 
+    
     if mode == "train":
+        data = np.load('train.npz', allow_pickle=True)
+        radii = []
+        for example in range(len(data.files)):
+            radii.append(data[f'simulation_trajectory_{example}'][1])
+
+        max_radius = np.max(np.concatenate(radii))
+        default_connectivity_radius = 0.1 #4*max_radius
         metadata = {
             "bounds": [[0, 1], [0, 1]],
             "sequence_length": num_time_steps,
-            "default_connectivity_radius": 0.1,
-            "dim": 2,
+            "default_connectivity_radius": default_connectivity_radius,
+            # "dim": 2,
             "vel_mean": [0.01,0.05],
             "vel_std": [0.5,0.1],
             "acc_mean": [0.002,0.003],
