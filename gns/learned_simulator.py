@@ -93,7 +93,14 @@ class LearnedSimulator(nn.Module):
             edge_features: tensor of shape (num_edges, num_edge_features)
             receivers, senders: tensors of shape (num_edges,) containing the receiver and sender indices of each edge
         """
-        
+
+        if self.use_particle_properties:
+            if len(list(particle_properties.shape)) == 1:
+                particle_radii = particle_properties.view(-1, 1) # shape = (num_particles,)
+            else:
+                particle_radii = particle_properties[:,0].view(-1, 1) # shape = (num_particles,)
+
+                
         num_particles = position_sequence.shape[0]
         current_position = position_sequence[:, -1, :] # last position: shape = (num_particles, spatial_dimension)
         last_velocities = torch.diff(position_sequence, dim=1) # last C-1 velocities: shape = (num_particles, C-1, spatial_dimension)
@@ -111,16 +118,17 @@ class LearnedSimulator(nn.Module):
         boundaries = torch.tensor(self.boundaries, requires_grad=False).to(self.device) # converting boundaries from np.ndarray to torch.tensor; shape = (spatial_dimension, 2); boundaries[:,0] and boundaries[:,1] give the coordinates of the low and high corners of the simulation box with shape (spatial_dimension,), respectively.
         distannce_to_lower_boundary = current_position - boundaries[:, 0] # shape = (num_particles, spatial_dimension);
         distannce_to_upper_boundary = boundaries[:, 1] - current_position # shape = (num_particles, spatial_dimension);
-
-        distance_to_boundaries = torch.cat([distannce_to_lower_boundary, distannce_to_upper_boundary], dim=-1)/self.connectivity_radius # shape = (num_particles, 2*spatial_dimension); note that distance_to_boundaries is normalized by the connectivity_radius.
-        # clip the distance to boundaries to [0,1], i.e., only consider distances that are less than or equal the connectivity_radius. Note that the distance_to_boundaries is always positive.
-        distance_to_boundaries = torch.clamp(distance_to_boundaries, -1, 1) # shape = (num_particles, 2*spatial_dimension)
-        node_features.append(distance_to_boundaries)
-
-        # particle properties
+        distance_to_boundaries = torch.cat([distannce_to_lower_boundary, distannce_to_upper_boundary], dim=-1)
         if self.use_particle_properties:
-            pass
-            # node_features.append(self.particle_type_embedding(particle_properties))
+            distance_to_boundaries = distance_to_boundaries/particle_radii # shape = (num_particles, 2*spatial_dimension); note that distance_to_boundaries is normalized by the particle radii.
+            # clamp the distance to boundaries to be within [-4, 4]a
+            distance_to_boundaries = torch.clamp(distance_to_boundaries, -4, 4) # shape = (num_particles, 2*spatial_dimension)
+        else:
+            distance_to_boundaries = distance_to_boundaries/self.connectivity_radius # shape = (num_particles, 2*spatial_dimension); note that distance_to_boundaries is normalized by the connectivity_radius.
+            # clamp the distance to boundaries to be within [-1, 1]connectivity_radius
+            distance_to_boundaries = torch.clamp(distance_to_boundaries, -1, 1) # shape = (num_particles, 2*spatial_dimension)
+        
+        node_features.append(distance_to_boundaries)
 
         """
         num_node_features:
@@ -133,7 +141,11 @@ class LearnedSimulator(nn.Module):
         edge_features = []
         receivers, senders = self.compute_graph_connectivity(current_position, num_particles_per_example)
         # normalized relative displacements across edges
-        relative_displacements = (current_position[senders,:] - current_position[receivers,:])/self.connectivity_radius # shape = (num_edges, spatial_dimension)
+        if self.use_particle_properties:
+            relative_displacements = (current_position[senders,:] - current_position[receivers,:])/(particle_radii[senders]+particle_radii[receivers]) # shape = (num_edges, spatial_dimension
+        else:
+            relative_displacements = (current_position[senders,:] - current_position[receivers,:])/self.connectivity_radius # shape = (num_edges, spatial_dimension)
+
         distances = torch.norm(relative_displacements, dim=-1, keepdim=True) # shape = (num_edges, 1)
         edge_features.append(torch.cat([relative_displacements, distances], dim=-1))
         """

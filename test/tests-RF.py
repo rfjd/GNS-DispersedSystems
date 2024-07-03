@@ -25,23 +25,25 @@ NUM_EDGE_FEATURES = 3
 normalization_stats = {'vel': {'mean': torch.FloatTensor([0.1,0.02]), 'std': torch.FloatTensor([1,4])},
                        'acc': {'mean': torch.FloatTensor([0.5,0.04]), 'std': torch.FloatTensor([2,3])}}
 
+USE_PARTICLE_PROPERTIES = False
 simulator = learned_simulator.LearnedSimulator(
-        num_node_features=NUM_NODE_FETURES,
-        num_edge_features=NUM_EDGE_FEATURES,
-        num_message_passing_steps=NUM_MESSAGE_PASSING_STEPS,
-        connectivity_radius=CONNECTIVITY_RADIUS,
-        normalization_stats=normalization_stats,
-        boundaries=np.array([[0,1],[0,1]]),
-        num_encoded_node_features=NUM_ENCODED_NODE_FEATURES,
-        num_encoded_edge_features=NUM_ENCODED_EDGE_FEATURES,
-        num_mlp_layers=NUM_MLP_LAYERS,
-        mlp_layer_size=MLP_LAYER_SIZE,
-        device='cpu')
+    num_node_features=NUM_NODE_FETURES,
+    num_edge_features=NUM_EDGE_FEATURES,
+    num_message_passing_steps=NUM_MESSAGE_PASSING_STEPS,
+    connectivity_radius=CONNECTIVITY_RADIUS,
+    normalization_stats=normalization_stats,
+    boundaries=np.array([[0,1],[0,1]]),
+    num_encoded_node_features=NUM_ENCODED_NODE_FEATURES,
+    num_encoded_edge_features=NUM_ENCODED_EDGE_FEATURES,
+    num_mlp_layers=NUM_MLP_LAYERS,
+    mlp_layer_size=MLP_LAYER_SIZE,
+    device='cpu',
+    use_particle_properties=USE_PARTICLE_PROPERTIES)
 
 num_particles = 3
 position_sequence = torch.rand(num_particles, C, 2)
 num_particles_per_example = torch.tensor([num_particles])
-particle_properties = torch.full((num_particles,), 0)
+particle_properties = torch.full((num_particles,), 0.5)
 
 node_features, edge_features, edges = simulator.encoder_preprocessor(position_sequence, num_particles_per_example, particle_properties)
 print(f"node_features: {node_features}")
@@ -105,8 +107,9 @@ NUM_ENCODED_EDGE_FEATURES = 128
 NUM_MLP_LAYERS = 2
 MLP_LAYER_SIZE = 128
 NUM_MESSAGE_PASSING_STEPS = 10
+USE_PARTICLE_PROPERTIES = False
 
-FLAGS = f"--C={C} --NUM_ENCODED_NODE_FEATURES={NUM_ENCODED_NODE_FEATURES} --NUM_ENCODED_EDGE_FEATURES={NUM_ENCODED_EDGE_FEATURES} --NUM_MLP_LAYERS={NUM_MLP_LAYERS} --MLP_LAYER_SIZE={MLP_LAYER_SIZE} --NUM_MESSAGE_PASSING_STEPS={NUM_MESSAGE_PASSING_STEPS}"
+FLAGS = f"--C={C} --NUM_ENCODED_NODE_FEATURES={NUM_ENCODED_NODE_FEATURES} --NUM_ENCODED_EDGE_FEATURES={NUM_ENCODED_EDGE_FEATURES} --NUM_MLP_LAYERS={NUM_MLP_LAYERS} --MLP_LAYER_SIZE={MLP_LAYER_SIZE} --NUM_MESSAGE_PASSING_STEPS={NUM_MESSAGE_PASSING_STEPS} --USE_PARTICLE_PROPERTIES={USE_PARTICLE_PROPERTIES}"
 
 # Train
 os.system(f"python3 -m gns.main --data_path={DATA_PATH} --model_path={MODEL_PATH} --ntraining_steps={number_steps} " + FLAGS)

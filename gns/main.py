@@ -52,6 +52,7 @@ FLAGS = flags.FLAGS
 
 # global variables
 flags.DEFINE_boolean('ROTATION', False, 'Whether to use rotation or not')
+flags.DEFINE_boolean('USE_PARTICLE_PROPERTIES', True, 'Whether to use particle properties or not')
 flags.DEFINE_integer('C', 6, 'Input sequence length')
 flags.DEFINE_integer('NUM_ENCODED_NODE_FEATURES', 128, 'Number of encoded node features')
 flags.DEFINE_integer('NUM_ENCODED_EDGE_FEATURES', 128, 'Number of encoded edge features')
@@ -68,6 +69,7 @@ NUM_MLP_LAYERS = FLAGS.NUM_MLP_LAYERS
 MLP_LAYER_SIZE = FLAGS.MLP_LAYER_SIZE
 NUM_MESSAGE_PASSING_STEPS = FLAGS.NUM_MESSAGE_PASSING_STEPS
 SPATIAL_DIMENSION = FLAGS.SPATIAL_DIMENSION
+USE_PARTICLE_PROPERTIES = FLAGS.USE_PARTICLE_PROPERTIES
 NUM_NODE_FEATURES = (C-1)*2+2*SPATIAL_DIMENSION # e.g., C = 6: 5*2+2*2 = 14
 NUM_EDGE_FEATURES = 3
 
@@ -148,7 +150,8 @@ def get_simulator(metadata: json,
         num_encoded_edge_features=NUM_ENCODED_EDGE_FEATURES,
         num_mlp_layers=NUM_MLP_LAYERS,
         mlp_layer_size=MLP_LAYER_SIZE,
-        device=device)
+        device=device,
+        use_particle_properties=USE_PARTICLE_PROPERTIES)
 
     return simulator
 
