@@ -73,7 +73,7 @@ NUM_EDGE_FEATURES = 3
 
 def rollout(simulator: learned_simulator.LearnedSimulator,
             position_sequence: torch.tensor,
-            particle_types: torch.tensor,
+            particle_properties: torch.tensor,
             num_particles_per_example: torch.tensor,
             num_steps: int,
             device: torch.device):
@@ -95,7 +95,7 @@ def rollout(simulator: learned_simulator.LearnedSimulator,
     for step in range(num_steps):
         predicted_position = simulator.predict_position(current_position_sequence,
                                                         [num_particles_per_example],
-                                                        particle_types) # shape = (num_particles, spatial_dimension)
+                                                        particle_properties) # shape = (num_particles, spatial_dimension)
         predictions.append(predicted_position)
         current_position_sequence = torch.cat([current_position_sequence[:, 1:, :], predicted_position[:,None,:]], dim=1) # shift the sequence forward by one step; note that the predicted new position is added to the sequence, and not the corresponding ground truth position.
 
@@ -108,7 +108,7 @@ def rollout(simulator: learned_simulator.LearnedSimulator,
         'initial_positions': position_sequence[:, :C, :].permute(1, 0, 2).cpu().numpy(),
         'predicted_rollout': predictions.cpu().numpy(),
         'ground_truth_rollout': ground_truth_positions.cpu().numpy(),
-        'particle_types': particle_types.cpu().numpy()
+        'particle_properties': particle_properties.cpu().numpy()
     }
 
     return rollout_dict, loss
@@ -171,19 +171,19 @@ def predict(device: str):
         os.makedirs(FLAGS.output_path)
 
     # Load the dataset
-    ds = data_loader.get_data_loader_by_trajectories(f"{FLAGS.data_path}test.npz") # list of trajectrory examples with content (positions, particle_type, num_particles_in_example)
+    ds = data_loader.get_data_loader_by_trajectories(f"{FLAGS.data_path}test.npz") # list of trajectrory examples with content (positions, particle_properties, num_particles_in_example)
     eval_loss = []
     with torch.no_grad():
         for example_id, trajectory_data in enumerate(ds):
             position_sequence = trajectory_data[0].to(device)
-            particle_types = trajectory_data[1].to(device) 
+            particle_properties = trajectory_data[1].to(device) 
             num_particles_in_example = torch.tensor([int(trajectory_data[2])], dtype=torch.int32).to(device)
             sequence_length = position_sequence.shape[1]
             num_steps = sequence_length - C
 
             rollout_dict, loss = rollout(simulator,
                                          position_sequence,
-                                         particle_types,
+                                         particle_properties,
                                          num_particles_in_example,
                                          num_steps,
                                          device)
@@ -309,17 +309,17 @@ def train(rank, flags, world_size, device):
                 torch.distributed.barrier()
             else:
                 pass
-            for example in dl:  # ((position, particle_type, material_property, n_particles_per_example), labels) are in dl
+            for example in dl:  # ((position, particle_properties, material_property, n_particles_per_example), labels) are in dl
                 COUNTER += 1
                 # print(f"counter is {COUNTER}")
                 # print(f"inside for example in dl loop") # example here is a list; example[i] is also a list
                 # print(f"len(example) is {len(example)}")
                 # print(f"example[0][0].shape is {example[0][0].shape}") # (num_particles, 6, DIM) last 6 positions
-                # print(f"example[0][1].shape is {example[0][1].shape}") # (num_particles, ) particle type
+                # print(f"example[0][1].shape is {example[0][1].shape}") # (num_particles, ) particle properties
                 # print(f"example[1].shape is {example[1].shape}")
                 # print(f"example[1] is {example[1]}") # What is this? The second entry of the example list/tuple
                 position = example[0][0].to(device_id)
-                particle_type = example[0][1].to(device_id)
+                particle_properties = example[0][1].to(device_id)
                 if n_features == 3:  # if dl includes material_property
                     material_property = example[0][2].to(device_id)
                     n_particles_per_example = example[0][3].to(device_id)
@@ -343,7 +343,7 @@ def train(rank, flags, world_size, device):
                         position_sequence=position.to(rank),
                         position_sequence_noise=sampled_noise.to(rank),
                         num_particles_per_example=n_particles_per_example.to(rank),
-                        particle_types=particle_type.to(rank)
+                        particle_properties=particle_properties.to(rank)
                     )
                 else:
                     pred_acc, target_acc = simulator.predict_acceleration(
@@ -351,7 +351,7 @@ def train(rank, flags, world_size, device):
                         position_sequence=position.to(device),
                         position_sequence_noise=sampled_noise.to(device),
                         num_particles_per_example=n_particles_per_example.to(device),
-                        particle_types=particle_type.to(device)
+                        particle_properties=particle_properties.to(device)
                     )
 
                 # Calculate the loss and take an average

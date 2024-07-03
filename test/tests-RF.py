@@ -41,9 +41,9 @@ simulator = learned_simulator.LearnedSimulator(
 num_particles = 3
 position_sequence = torch.rand(num_particles, C, 2)
 num_particles_per_example = torch.tensor([num_particles])
-particle_types = torch.full((num_particles,), 0)
+particle_properties = torch.full((num_particles,), 0)
 
-node_features, edge_features, edges = simulator.encoder_preprocessor(position_sequence, num_particles_per_example, particle_types)
+node_features, edge_features, edges = simulator.encoder_preprocessor(position_sequence, num_particles_per_example, particle_properties)
 print(f"node_features: {node_features}")
 print(f"edge_features: {edge_features}")
 print(f"edges: {edges}")
@@ -67,7 +67,7 @@ print(f"edges: {edges}")
 #     [0, 0, 0, 1, 1, 1, 2, 2, 2],
 #     [0, 1, 2, 0, 1, 2, 0, 1, 2]])
 
-predicted_position = simulator.predict_position(position_sequence, num_particles_per_example, particle_types) # tests encoder_preprocessor and encoder_processor_decoder
+predicted_position = simulator.predict_position(position_sequence, num_particles_per_example, particle_properties) # tests encoder_preprocessor and encoder_processor_decoder
 print(predicted_position)
 
 # CORRECT ANSWER:

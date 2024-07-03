@@ -29,12 +29,14 @@ class LearnedSimulator(nn.Module):
                  num_encoded_edge_features: int = 128,
                  num_mlp_layers: int = 2,
                  mlp_layer_size: int = 128,
-                 device="cpu"):
+                 device="cpu",
+                 use_particle_properties: bool = False):
         super().__init__()
         self.connectivity_radius = connectivity_radius
         self.normalization_stats = normalization_stats
         self.boundaries = boundaries
-
+        self.use_particle_properties = use_particle_properties
+        
         self.output_node_size = spatial_dimension + 1 if rotation else spatial_dimension
         self.encoder_processor_decoder = network_architecture.EncoderProcessorDecoder(
             num_node_features,
@@ -77,14 +79,14 @@ class LearnedSimulator(nn.Module):
     def encoder_preprocessor(self,
                              position_sequence: torch.tensor,
                              num_particles_per_example: torch.tensor,
-                             particle_types: torch.tensor):
+                             particle_properties: torch.tensor):
         """
-        This method encodes the particle positions and types using a sequence of C=6 most recent positions.
+        This method encodes the particle positions and properties using a sequence of C=6 most recent positions.
 
         Arguments:
             position_sequence: tensor of shape (num_particles, C, spatial_dimension)
             num_particles_per_example: tensor of shape (batch_size,) containing the number of particles in each example
-            particle_types: tensor of shape (num_particles,) containing the type of each particle
+            particle_properties: tensor of shape (num_particles, N) containing N properties of each particle
 
         Returns:
             node_features: tensor of shape (num_particles, num_node_features)
@@ -115,14 +117,15 @@ class LearnedSimulator(nn.Module):
         distance_to_boundaries = torch.clamp(distance_to_boundaries, -1, 1) # shape = (num_particles, 2*spatial_dimension)
         node_features.append(distance_to_boundaries)
 
-        # # particle types
-        # if self.number_particle_types > 1:
-        #     node_features.append(self.particle_type_embedding(particle_types))
+        # particle properties
+        if self.use_particle_properties:
+            pass
+            # node_features.append(self.particle_type_embedding(particle_properties))
 
         """
         num_node_features:
-            rotation = False: (C-1)*spatial_dimension + 2*spatial_dimension + particle_type_embedding_size
-            rotation = True: (C-1)*spatial_dimension + 2*spatial_dimension + particle_type_embedding_size + ...
+            rotation = False: (C-1)*spatial_dimension + 2*spatial_dimension
+            rotation = True: (C-1)*spatial_dimension + 2*spatial_dimension + ...
         RF: interestingly, so as of now, this method should create node features with the same size as the input node features. There should be a better way to do this!
         """
         
@@ -168,18 +171,18 @@ class LearnedSimulator(nn.Module):
     def predict_position(self,
                          position_sequence: torch.tensor,
                          num_particles_per_example: torch.tensor,
-                         particle_types: torch.tensor):
+                         particle_properties: torch.tensor):
         """
-        This method predicts the positions of the particles given the current position sequence, the number of particles per example, and the particle types. It performs a full pass of GNN, and calls the internal method decoder_postprocessor at the end to compute the predicted positions.
+        This method predicts the positions of the particles given the current position sequence, the number of particles per example, and the particle properties. It performs a full pass of GNN, and calls the internal method decoder_postprocessor at the end to compute the predicted positions.
         Arguments:
             position_sequence: tensor of shape (num_particles, C, spatial_dimension)
             num_particles_per_example: tensor of shape (batch_size,) containing the number of particles in each example
-            particle_types: tensor of shape (num_particles,) containing the type of each particle
+            particle_properties: tensor of shape (num_particles, N) containing N properties of each particle
         
         Returns:
             predicted_position: tensor of shape (num_particles, spatial_dimension)
         """
-        node_features, edge_features, edges = self.encoder_preprocessor(position_sequence, num_particles_per_example, particle_types)
+        node_features, edge_features, edges = self.encoder_preprocessor(position_sequence, num_particles_per_example, particle_properties)
         predicted_normalized_acceleration = self.encoder_processor_decoder(node_features, edge_features, edges)
         predicted_position = self.decoder_postprocessor(predicted_normalized_acceleration, position_sequence)
         return predicted_position
@@ -190,7 +193,7 @@ class LearnedSimulator(nn.Module):
                              position_sequence: torch.tensor,
                              position_sequence_noise: torch.tensor,
                              num_particles_per_example: torch.tensor,
-                             particle_types: torch.tensor):
+                             particle_properties: torch.tensor):
         """
         This method predicts the normalized accelerations given the next position (true training data), the current position sequence, and the noisy position sequence.
         Arguments:
@@ -198,13 +201,13 @@ class LearnedSimulator(nn.Module):
             position_sequence: tensor of shape (num_particles, C, spatial_dimension)
             noisy_position_sequence: tensor of shape (num_particles, C, spatial_dimension)
             num_particles_per_example: tensor of shape (batch_size,) containing the number of particles in each example
-            particle_types: tensor of shape (num_particles,) containing the type of each particle
+            particle_properties: tensor of shape (num_particles, N) containing N properties of each particle
         Returns:
             predicted_normalized_acceleration: predicted normalized acceleration from the noisy position sequence; tensor of shape (num_particles, spatial_dimension)
             target_normalized_acceleration: predicted normalized acceleration while the velocity if computed noise free; tensor of shape (num_particles, spatial_dimension)
         """
         noisy_position_sequence = position_sequence + position_sequence_noise
-        node_features, edge_features, edges = self.encoder_preprocessor(noisy_position_sequence, num_particles_per_example, particle_types)
+        node_features, edge_features, edges = self.encoder_preprocessor(noisy_position_sequence, num_particles_per_example, particle_properties)
         predicted_normalized_acceleration = self.encoder_processor_decoder(node_features, edge_features, edges)
 
         next_position_adjusted = next_position + position_sequence_noise[:,-1,:] # ensures that the velocity is being computed noise free; acceleration will still be noisy however. An alternative is to let next_position_adjusted = next_positions + position_sequence_noise[:, -1] + (position_sequence_noise[:, -1] - position_sequence_noise[:, -2]), which ensures that the acceleration is noise free.
