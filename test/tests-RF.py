@@ -20,8 +20,8 @@ MLP_LAYER_SIZE = 16
 NUM_MESSAGE_PASSING_STEPS = 10
 CONNECTIVITY_RADIUS = 1
 SPATIAL_DIMENSION = 2
-USE_PARTICLE_PROPERTIES = False
-NUM_NODE_FETURES = (C-1)*2+2*SPATIAL_DIMENSION+1*(USE_PARTICLE_PROPERTIES) # e.g., C = 6: 5*2+2*2 = 15
+USE_PARTICLE_PROPERTIES = True
+NUM_NODE_FETURES = (C-1)*2+2*SPATIAL_DIMENSION+0*(USE_PARTICLE_PROPERTIES) # e.g., C = 6: 5*2+2*2+0 = 14
 print(NUM_NODE_FETURES)
 NUM_EDGE_FEATURES = 3
 normalization_stats = {'vel': {'mean': torch.FloatTensor([0.1,0.02]), 'std': torch.FloatTensor([1,4])},
@@ -53,6 +53,7 @@ print(f"edge_features: {edge_features}")
 print(f"edges: {edges}")
 
 # CORRECT ANSWER:
+### USE_PARTICLE_PROPERTIES = False
 # node_features: tensor([
 #     [ 0.1534,  0.1429,  0.2520, -0.0219,  0.9023,  0.7617,  0.0977,  0.2383],
 #     [ 0.5998,  0.0581, -0.6701, -0.0936,  0.3242,  0.3931,  0.6758,  0.6069],
@@ -71,14 +72,39 @@ print(f"edges: {edges}")
 #     [0, 0, 0, 1, 1, 1, 2, 2, 2],
 #     [0, 1, 2, 0, 1, 2, 0, 1, 2]])
 
+
+### USE_PARTICLE_PROPERTIES = True
+# node_features: tensor([
+#     [ 0.1534,  0.1429,  0.2520, -0.0219,  1.8047,  1.5233,  0.1953,  0.4767],
+#     [ 0.5998,  0.0581, -0.6701, -0.0936,  0.6483,  0.7862,  1.3517,  1.2138],
+#     [-0.0687, -0.0890, -0.2022,  0.0354,  1.5664,  1.5410,  0.4336,  0.4590]])
+# edge_features: tensor([
+#     [ 0.0000,  0.0000,  0.0000],
+#     [ 0.5782,  0.3686,  0.6857],
+#     [ 0.1192, -0.0088,  0.1195],
+#     [-0.5782, -0.3686,  0.6857],
+#     [ 0.0000,  0.0000,  0.0000],
+#     [-0.4590, -0.3774,  0.5942],
+#     [-0.1192,  0.0088,  0.1195],
+#     [ 0.4590,  0.3774,  0.5942],
+#     [ 0.0000,  0.0000,  0.0000]])
+# edges: tensor([
+#     [0, 0, 0, 1, 1, 1, 2, 2, 2],
+#     [0, 1, 2, 0, 1, 2, 0, 1, 2]])
+
 predicted_position = simulator.predict_position(position_sequence, num_particles_per_example, particle_properties) # tests encoder_preprocessor and encoder_processor_decoder
 print(predicted_position)
 
 # CORRECT ANSWER:
+### USE_PARTICLE_PROPERTIES = False
 # tensor([[1.9101, 2.0501],
 #         [0.1099, 1.7092],
 #         [1.3443, 2.2427]], grad_fn=<AddBackward0>)
 
+### USE_PARTICLE_PROPERTIES = True
+# tensor([[1.9424, 2.0287],
+#         [0.1308, 1.7879],
+#         [1.4392, 2.2988]], grad_fn=<AddBackward0>)
 
 #######################################################
 # train and rollout tests
@@ -109,7 +135,7 @@ NUM_ENCODED_EDGE_FEATURES = 128
 NUM_MLP_LAYERS = 2
 MLP_LAYER_SIZE = 128
 NUM_MESSAGE_PASSING_STEPS = 10
-USE_PARTICLE_PROPERTIES = False
+USE_PARTICLE_PROPERTIES = True
 
 FLAGS = f"--C={C} --NUM_ENCODED_NODE_FEATURES={NUM_ENCODED_NODE_FEATURES} --NUM_ENCODED_EDGE_FEATURES={NUM_ENCODED_EDGE_FEATURES} --NUM_MLP_LAYERS={NUM_MLP_LAYERS} --MLP_LAYER_SIZE={MLP_LAYER_SIZE} --NUM_MESSAGE_PASSING_STEPS={NUM_MESSAGE_PASSING_STEPS} --USE_PARTICLE_PROPERTIES={USE_PARTICLE_PROPERTIES}"
 
@@ -121,6 +147,7 @@ os.system(f"python3 -m gns.main --mode=rollout --data_path={DATA_PATH} --model_p
 
 # Expected output:
 
+### USE_PARTICLE_PROPERTIES = False
 # Loss:
 # 3517.70849609375
 # 2532.505126953125.
@@ -137,6 +164,25 @@ os.system(f"python3 -m gns.main --mode=rollout --data_path={DATA_PATH} --model_p
 # Rollout Prediction Loss:
 # 998.7435913085938
 # 908.07470703125
+
+### USE_PARTICLE_PROPERTIES = True
+# Loss:
+# 3523.60205078125
+# 2527.055419921875
+# 2591.437255859375
+# 2316.35595703125
+# 1661.1749267578125
+# 3863.87060546875
+# 2919.009033203125
+# 2433.41015625
+# 1949.8564453125
+# 3616.770263671875
+# 2696.768798828125
+
+# Rollout Prediction Loss:
+# 1017.0540161132812
+# 958.5850830078125
+
 
 ## cleanup
 os.system(f"rm {MODEL_PATH}model-* {MODEL_PATH}train_state-* {ROLLOUT_PATH}rollout_ex*")
