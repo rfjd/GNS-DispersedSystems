@@ -130,8 +130,8 @@ class LearnedSimulator(nn.Module):
         
         node_features.append(distance_to_boundaries)
 
-        if self.use_particle_properties:
-            node_features.append(particle_radii)
+        # if self.use_particle_properties:
+        #     node_features.append(particle_radii)
         
         """
         num_node_features:
