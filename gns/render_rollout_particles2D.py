@@ -64,7 +64,7 @@ class Render():
         self.num_particles = trajectory[rollout_cases[0][0]].shape[1]
         self.num_steps = trajectory[rollout_cases[0][0]].shape[0]
         self.boundaries = rollout_data["metadata"]["bounds"]
-        self.particle_type = rollout_data["particle_types"]
+        self.particle_properties = rollout_data["particle_properties"]
 
     def color_map(self):
         """
@@ -78,17 +78,17 @@ class Render():
             print(color_index)
             color_map[color_index] = color
         color_map = list(color_map)
-        return color_map
+        return "blue"
 
     def color_mask(self):
         """
         Get color mask and corresponding colors for visualization
         """
         color_mask = []
-        for material_id, color in TYPE_TO_COLOR.items():
-            mask = np.array(self.particle_type) == material_id
-            if mask.any() == True:
-                color_mask.append([mask, color])
+        # for material_id, color in TYPE_TO_COLOR.items():
+        #     mask = np.array(self.particle_type) == material_id
+        #     if mask.any() == True:
+        #         color_mask.append([mask, color])
         return color_mask
 
     def render_gif_animation(self, timestep_stride=3, vertical_camera_angle=20, viewpoint_rotation=0.5):
@@ -138,7 +138,8 @@ class Render():
         # Define datacase name
         trajectory_datacases = [self.rollout_cases[0][0], self.rollout_cases[1][0]]
         render_datacases = [self.rollout_cases[0][1], self.rollout_cases[1][1]]
-        
+        print(f"trajectory_datacases: {trajectory_datacases}") # grund truth rollout, predicted rollout
+        print(f"self.trajectory.shape={self.trajectory[trajectory_datacases[0]].shape}")
         # Get color mask for visualization
         color_mask = self.color_mask()
 
@@ -148,9 +149,9 @@ class Render():
             print(f"Render step {i}/{self.num_steps}")
             for j, datacase in enumerate(trajectory_datacases):
                 axes[j].cla()
-                for mask, color in color_mask:
-                    axes[j].scatter(self.trajectory[datacase][i][mask, 0],
-                                    self.trajectory[datacase][i][mask, 1], s=point_size, color=color)
+                # for mask, color in color_mask:
+                axes[j].scatter(self.trajectory[datacase][i,:,0],
+                                    self.trajectory[datacase][i,:,1], s=point_size, color="blue")
                 axes[j].grid(True, which='both')
                 axes[j].set_title(render_datacases[j])
                 axes[j].set_xlim([float(xboundary[0]), float(xboundary[1])])
