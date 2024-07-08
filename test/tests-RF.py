@@ -20,27 +20,20 @@ MLP_LAYER_SIZE = 16
 NUM_MESSAGE_PASSING_STEPS = 10
 CONNECTIVITY_RADIUS = 1
 SPATIAL_DIMENSION = 2
-USE_PARTICLE_PROPERTIES = True
-NUM_NODE_FETURES = (C-1)*2+2*SPATIAL_DIMENSION+0*(USE_PARTICLE_PROPERTIES) # e.g., C = 6: 5*2+2*2+0 = 14
-print(NUM_NODE_FETURES)
-NUM_EDGE_FEATURES = 3
-normalization_stats = {'vel': {'mean': torch.FloatTensor([0.1,0.02]), 'std': torch.FloatTensor([1,4])},
-                       'acc': {'mean': torch.FloatTensor([0.5,0.04]), 'std': torch.FloatTensor([2,3])}}
-
+NUM_NODE_FETURES = (C-1)*2+2*SPATIAL_DIMENSION # e.g., C = 6: 5*2+2*2 = 14
+NUM_EDGE_FEATURES = (C-1)*SPATIAL_DIMENSION+3 # e.g., C = 6: 5*2+3 = 13
 
 simulator = learned_simulator.LearnedSimulator(
     num_node_features=NUM_NODE_FETURES,
     num_edge_features=NUM_EDGE_FEATURES,
     num_message_passing_steps=NUM_MESSAGE_PASSING_STEPS,
     connectivity_radius=CONNECTIVITY_RADIUS,
-    normalization_stats=normalization_stats,
     boundaries=np.array([[0,1],[0,1]]),
     num_encoded_node_features=NUM_ENCODED_NODE_FEATURES,
     num_encoded_edge_features=NUM_ENCODED_EDGE_FEATURES,
     num_mlp_layers=NUM_MLP_LAYERS,
     mlp_layer_size=MLP_LAYER_SIZE,
-    device='cpu',
-    use_particle_properties=USE_PARTICLE_PROPERTIES)
+    device='cpu')
 
 num_particles = 3
 position_sequence = torch.rand(num_particles, C, 2)
@@ -135,9 +128,8 @@ NUM_ENCODED_EDGE_FEATURES = 128
 NUM_MLP_LAYERS = 2
 MLP_LAYER_SIZE = 128
 NUM_MESSAGE_PASSING_STEPS = 10
-USE_PARTICLE_PROPERTIES = True
 
-FLAGS = f"--C={C} --NUM_ENCODED_NODE_FEATURES={NUM_ENCODED_NODE_FEATURES} --NUM_ENCODED_EDGE_FEATURES={NUM_ENCODED_EDGE_FEATURES} --NUM_MLP_LAYERS={NUM_MLP_LAYERS} --MLP_LAYER_SIZE={MLP_LAYER_SIZE} --NUM_MESSAGE_PASSING_STEPS={NUM_MESSAGE_PASSING_STEPS} --USE_PARTICLE_PROPERTIES={USE_PARTICLE_PROPERTIES}"
+FLAGS = f"--C={C} --NUM_ENCODED_NODE_FEATURES={NUM_ENCODED_NODE_FEATURES} --NUM_ENCODED_EDGE_FEATURES={NUM_ENCODED_EDGE_FEATURES} --NUM_MLP_LAYERS={NUM_MLP_LAYERS} --MLP_LAYER_SIZE={MLP_LAYER_SIZE} --NUM_MESSAGE_PASSING_STEPS={NUM_MESSAGE_PASSING_STEPS}"
 
 # Train
 os.system(f"python3 -m gns.main --data_path={DATA_PATH} --model_path={MODEL_PATH} --ntraining_steps={number_steps} " + FLAGS)
@@ -145,43 +137,43 @@ os.system(f"python3 -m gns.main --data_path={DATA_PATH} --model_path={MODEL_PATH
 # Rollout Prediction
 os.system(f"python3 -m gns.main --mode=rollout --data_path={DATA_PATH} --model_path={MODEL_PATH} --output_path={ROLLOUT_PATH} --model_file=model-{number_steps}.pt --train_state_file=train_state-{number_steps}.pt " + FLAGS)
 
-# Expected output:
+# # Expected output:
 
-### USE_PARTICLE_PROPERTIES = False
-# Loss:
-# 3517.70849609375
-# 2532.505126953125.
-# 2587.94091796875.
-# 2318.3408203125.
-# 1665.0546875.
-# 3879.59716796875.
-# 2926.023681640625.
-# 2424.763427734375.
-# 1957.2808837890625.
-# 3620.72900390625.
-# 2703.468994140625.
+# ### USE_PARTICLE_PROPERTIES = False
+# # Loss:
+# # 3517.70849609375
+# # 2532.505126953125.
+# # 2587.94091796875.
+# # 2318.3408203125.
+# # 1665.0546875.
+# # 3879.59716796875.
+# # 2926.023681640625.
+# # 2424.763427734375.
+# # 1957.2808837890625.
+# # 3620.72900390625.
+# # 2703.468994140625.
 
-# Rollout Prediction Loss:
-# 998.7435913085938
-# 908.07470703125
+# # Rollout Prediction Loss:
+# # 998.7435913085938
+# # 908.07470703125
 
-### USE_PARTICLE_PROPERTIES = True
-# Loss:
-# 3523.60205078125
-# 2527.055419921875
-# 2591.437255859375
-# 2316.35595703125
-# 1661.1749267578125
-# 3863.87060546875
-# 2919.009033203125
-# 2433.41015625
-# 1949.8564453125
-# 3616.770263671875
-# 2696.768798828125
+# ### USE_PARTICLE_PROPERTIES = True
+# # Loss:
+# # 3523.60205078125
+# # 2527.055419921875
+# # 2591.437255859375
+# # 2316.35595703125
+# # 1661.1749267578125
+# # 3863.87060546875
+# # 2919.009033203125
+# # 2433.41015625
+# # 1949.8564453125
+# # 3616.770263671875
+# # 2696.768798828125
 
-# Rollout Prediction Loss:
-# 1017.0540161132812
-# 958.5850830078125
+# # Rollout Prediction Loss:
+# # 1017.0540161132812
+# # 958.5850830078125
 
 
 ## cleanup

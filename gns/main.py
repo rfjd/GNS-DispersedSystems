@@ -38,7 +38,7 @@ flags.DEFINE_string('model_file', None, help=('Model filename (.pt) to resume fr
 flags.DEFINE_string('train_state_file', 'train_state.pt', help=('Train state filename (.pt) to resume from. Can also use "latest" to default to newest file.'))
 
 flags.DEFINE_integer('ntraining_steps', int(2E7), help='Number of training steps.')
-flags.DEFINE_integer('nsave_steps', int(5000), help='Number of steps at which to save the model.')
+flags.DEFINE_integer('nsave_steps', int(50000), help='Number of steps at which to save the model.')
 
 # Learning rate parameters
 flags.DEFINE_float('lr_init', 1e-4, help='Initial learning rate.')
@@ -52,7 +52,6 @@ FLAGS = flags.FLAGS
 
 # global variables
 flags.DEFINE_boolean('ROTATION', False, 'Whether to use rotation or not')
-flags.DEFINE_boolean('USE_PARTICLE_PROPERTIES', True, 'Whether to use particle properties or not')
 flags.DEFINE_integer('C', 6, 'Input sequence length')
 flags.DEFINE_integer('NUM_ENCODED_NODE_FEATURES', 128, 'Number of encoded node features')
 flags.DEFINE_integer('NUM_ENCODED_EDGE_FEATURES', 128, 'Number of encoded edge features')
@@ -69,9 +68,8 @@ NUM_MLP_LAYERS = FLAGS.NUM_MLP_LAYERS
 MLP_LAYER_SIZE = FLAGS.MLP_LAYER_SIZE
 NUM_MESSAGE_PASSING_STEPS = FLAGS.NUM_MESSAGE_PASSING_STEPS
 SPATIAL_DIMENSION = FLAGS.SPATIAL_DIMENSION
-USE_PARTICLE_PROPERTIES = FLAGS.USE_PARTICLE_PROPERTIES
-NUM_NODE_FEATURES = (C-1)*2+2*SPATIAL_DIMENSION+0*(USE_PARTICLE_PROPERTIES) # e.g., C = 6: 5*2+2*2+0 = 14
-NUM_EDGE_FEATURES = 3
+NUM_NODE_FEATURES = (C-1)*2+2*SPATIAL_DIMENSION # e.g., C = 6: 5*2+2*2 = 14
+NUM_EDGE_FEATURES = (C-1)*2+3 # e.g., C = 6: 5*2+3 = 13
 
 def rollout(simulator: learned_simulator.LearnedSimulator,
             position_sequence: torch.tensor,
@@ -134,24 +132,23 @@ def get_simulator(metadata: json,
     """
 
     # RF why do we need to add noise to the std deviation?
-    normalization_stats = {
-        'acc': {'mean': torch.FloatTensor(metadata['acc_mean']).to(device),'std': torch.sqrt(torch.FloatTensor(metadata['acc_std'])**2 + acc_noise_std**2).to(device)},
-        'vel': {'mean': torch.FloatTensor(metadata['vel_mean']).to(device),'std': torch.sqrt(torch.FloatTensor(metadata['vel_std'])**2+vel_noise_std**2).to(device)}
-    }
+    # normalization_stats = {
+    #     'acc': {'mean': torch.FloatTensor(metadata['acc_mean']).to(device),'std': torch.sqrt(torch.FloatTensor(metadata['acc_std'])**2 + acc_noise_std**2).to(device)},
+    #     'vel': {'mean': torch.FloatTensor(metadata['vel_mean']).to(device),'std': torch.sqrt(torch.FloatTensor(metadata['vel_std'])**2+vel_noise_std**2).to(device)}
+    # }
 
     simulator = learned_simulator.LearnedSimulator(
         num_node_features=NUM_NODE_FEATURES,
         num_edge_features=NUM_EDGE_FEATURES,
         num_message_passing_steps=NUM_MESSAGE_PASSING_STEPS,
         connectivity_radius=metadata['default_connectivity_radius'],
-        normalization_stats=normalization_stats,
+        # normalization_stats=normalization_stats,
         boundaries=np.array(metadata['bounds']),
         num_encoded_node_features=NUM_ENCODED_NODE_FEATURES,
         num_encoded_edge_features=NUM_ENCODED_EDGE_FEATURES,
         num_mlp_layers=NUM_MLP_LAYERS,
         mlp_layer_size=MLP_LAYER_SIZE,
-        device=device,
-        use_particle_properties=USE_PARTICLE_PROPERTIES)
+        device=device)
 
     return simulator
 
