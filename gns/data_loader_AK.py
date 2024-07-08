@@ -89,88 +89,89 @@ class TrajectoriesSampleDataset(Dataset):
             training_data = (
                 (
                     torch.tensor(positions_in_sample).to(torch.float32).contiguous(),
-                    torch.tensor(particle_type).contiguous(),
+                    torch.tensor(particle_type).to(torch.float32).contiguous(),
                     torch.tensor(material_property).to(torch.float32).contiguous(),
                     num_particle_in_sample,
                 ),
-                label
+                label,
             )
         else:
             training_data = (
                 (
                     torch.tensor(positions).to(torch.float32).contiguous(),
-                    torch.tensor(particle_type).contiguous(),
+                    torch.tensor(particle_type).to(torch.float32).contiguous(),
                     num_particle_in_sample,
                 ),
-                label
+                label,
             )
-        
+
         return training_data
-    
+
     @property
     def is_property_feature(self):
         return len(self._trajectories_data[0]) >= 3
 
 
-def collate_fn(data):
-    """Collate function for SamplesDataset.
+# https://pytorch.org/tutorials/beginner/data_loading_tutorial.html?highlight=collate_fn
+def collate_trajectories_sample_batch(batch):
+    """
+    Merges a list of samples to form a mini-batch of Tensor(s).  Used when using batched loading
+    from a map-style dataset.
 
     Args:
-        data (list): List of tuples of the form ((positions, particle_type, n_particles_per_example), label).
+        batch (list): list of tuples of the form ((positions, particle_type, n_particles_per_example), label).
 
     Returns:
         tuple: Tuple of the form ((positions, particle_type, n_particles_per_example), label).
     """
-    material_property_as_feature = True if len(data[0][0]) >= 4 else False
-    position_list = []
-    particle_type_list = []
-    if material_property_as_feature:
-        material_property_list = []
-    n_particles_per_example_list = []
-    label_list = []
+    positions_batch = []
+    particle_types_batch = []
+    material_properties_batch = []
+    num_particles_batch = []
+    labels_batch = []
 
-    if material_property_as_feature:
-        for (
-            positions,
-            particle_type,
-            material_property,
-            n_particles_per_example,
-        ), label in data:
-            position_list.append(positions)
-            particle_type_list.append(particle_type)
-            material_property_list.append(material_property)
-            n_particles_per_example_list.append(n_particles_per_example)
-            label_list.append(label)
-    else:
-        for (positions, particle_type, n_particles_per_example), label in data:
-            position_list.append(positions)
-            particle_type_list.append(particle_type)
-            n_particles_per_example_list.append(n_particles_per_example)
-            label_list.append(label)
+    has_material_property = len(batch[0][0]) >= 4
 
-    if material_property_as_feature:
-        collated_data = (
+    for sample in batch:
+        (positions, particle_type, *material_property, num_particles), label = sample
+        positions_batch.append(positions)
+        particle_types_batch.append(particle_type)
+        if has_material_property:
+            material_properties_batch.append(material_property[0])
+        num_particles_batch.append(num_particles)
+        labels_batch.append(label)
+
+    positions_batch = torch.nn.utils.rnn.pad_sequence(
+        positions_batch, batch_first=True
+    ).contiguous()
+    particle_types_batch = torch.nn.utils.rnn.pad_sequence(
+        particle_types_batch, batch_first=True
+    ).contiguous()
+    if has_material_property:
+        material_properties_batch = torch.nn.utils.rnn.pad_sequence(
+            material_properties_batch, batch_first=True
+        ).contiguous()
+    labels_batch = torch.stack(labels_batch).contiguous()
+
+    if has_material_property:
+        return (
             (
-                torch.tensor(np.vstack(position_list)).to(torch.float32).contiguous(),
-                torch.tensor(np.concatenate(particle_type_list)).contiguous(),
-                torch.tensor(np.concatenate(material_property_list))
-                .to(torch.float32)
-                .contiguous(),
-                torch.tensor(n_particles_per_example_list).contiguous(),
+                positions_batch,
+                particle_types_batch,
+                material_properties_batch,
+                num_particles_batch,
             ),
-            torch.tensor(np.vstack(label_list)).to(torch.float32).contiguous(),
+            labels_batch,
         )
     else:
-        collated_data = (
+        return (
             (
-                torch.tensor(np.vstack(position_list)).to(torch.float32).contiguous(),
-                torch.tensor(np.concatenate(particle_type_list)).contiguous(),
-                torch.tensor(n_particles_per_example_list).contiguous(),
+                positions_batch, 
+                particle_types_batch,
+                num_particles_batch,
             ),
-            torch.tensor(np.vstack(label_list)).to(torch.float32).contiguous(),
+            labels_batch,
         )
-
-    return collated_data
 
 
 # https://pytorch.org/docs/stable/data.html#torch.utils.data.Dataset
@@ -248,13 +249,13 @@ def get_data_loader_by_samples(path, input_length_sequence, batch_size, shuffle=
     Returns:
         torch.utils.data.DataLoader: Data loader for the dataset.
     """
-    dataset = SamplesDataset(path, input_length_sequence)
-    return torch.utils.data.DataLoader(
+    dataset = TrajectoriesSampleDataset(path, input_length_sequence)
+    return DataLoader(
         dataset,
         batch_size=batch_size,
         shuffle=shuffle,
         pin_memory=True,
-        collate_fn=collate_fn,
+        collate_fn=collate_trajectories_sample_batch,
     )
 
 
@@ -268,6 +269,4 @@ def get_data_loader_by_trajectories(path):
         torch.utils.data.DataLoader: Data loader for the dataset.
     """
     dataset = TrajectoriesDataset(path)
-    return torch.utils.data.DataLoader(
-        dataset, batch_size=None, shuffle=False, pin_memory=True
-    )
+    return DataLoader(dataset, batch_size=None, shuffle=False, pin_memory=True)
