@@ -119,6 +119,18 @@ class InteractionNetwork(gnn.MessagePassing):
                              num_encoded_edge_features)
         self.edge_mlp = nn.Sequential(*edge_mlp,nn.LayerNorm(num_encoded_edge_features))
 
+        # Edge update MLP
+        edge_update_mlp = build_mlp(num_encoded_edge_features,
+                                    [mlp_layer_size for _ in range(num_mlp_layers)],
+                                    num_encoded_edge_features)
+        self.edge_update_mlp = nn.Sequential(*edge_update_mlp, nn.LayerNorm(num_encoded_edge_features))
+        
+        # Node update MLP
+        node_update_mlp = build_mlp(num_encoded_node_features,
+                                    [mlp_layer_size for _ in range(num_mlp_layers)],
+                                    num_encoded_node_features)
+        self.node_update_mlp = nn.Sequential(*node_update_mlp, nn.LayerNorm(num_encoded_node_features))
+
 
     def forward(self,
                 x: torch.tensor,
@@ -136,7 +148,9 @@ class InteractionNetwork(gnn.MessagePassing):
         """
         x_residual, e_residual = x, e
         x, e = self.propagate(edge_index, x=x, e=e)
-        # the propagate method internally calls message, aggregate, and update 
+        # the propagate method internally calls message, aggregate, and update
+        x = self.node_update_mlp(x)  # Further update the node features
+        e = self.edge_update_mlp(e)  # Further update the edge features        
         return x+x_residual, e+e_residual
 
     def message(self,
