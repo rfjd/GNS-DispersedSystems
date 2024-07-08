@@ -21,7 +21,7 @@ class LearnedSimulator(nn.Module):
                  num_edge_features: int,
                  num_message_passing_steps: int,
                  connectivity_radius: float,
-                 normalization_stats: Dict['str', Dict['str', torch.tensor]],
+                 # normalization_stats: Dict['str', Dict['str', torch.tensor]],
                  boundaries: np.ndarray, # shape = (spatial_dimension, 2): lo and hi corners of the simulation box
                  rotation: bool = False,
                  spatial_dimension: int = 2,
@@ -29,13 +29,10 @@ class LearnedSimulator(nn.Module):
                  num_encoded_edge_features: int = 128,
                  num_mlp_layers: int = 2,
                  mlp_layer_size: int = 128,
-                 device="cpu",
-                 use_particle_properties: bool = False):
+                 device="cpu"):
         super().__init__()
         self.connectivity_radius = connectivity_radius
-        self.normalization_stats = normalization_stats
         self.boundaries = boundaries
-        self.use_particle_properties = use_particle_properties
         
         self.output_node_size = spatial_dimension + 1 if rotation else spatial_dimension
         self.encoder_processor_decoder = network_architecture.EncoderProcessorDecoder(
@@ -49,6 +46,14 @@ class LearnedSimulator(nn.Module):
             self.output_node_size)
         self.device = device
 
+    def get_particle_radii(self, particle_properties: torch.tensor):
+        if len(list(particle_properties.shape)) == 1:
+            particle_radii = particle_properties.view(-1, 1) # shape = (num_particles,)
+        else:
+            particle_radii = particle_properties[:,0].view(-1, 1) # shape = (num_particles,)
+
+        return particle_radii
+    
     def forward(self):
         pass
 
@@ -93,14 +98,8 @@ class LearnedSimulator(nn.Module):
             edge_features: tensor of shape (num_edges, num_edge_features)
             receivers, senders: tensors of shape (num_edges,) containing the receiver and sender indices of each edge
         """
-
-        if self.use_particle_properties:
-            if len(list(particle_properties.shape)) == 1:
-                particle_radii = particle_properties.view(-1, 1) # shape = (num_particles,)
-            else:
-                particle_radii = particle_properties[:,0].view(-1, 1) # shape = (num_particles,)
-
-                
+      
+        particle_radii = self.get_particle_radii(particle_properties) # shape = (num_particles, 1)
         num_particles = position_sequence.shape[0]
         current_position = position_sequence[:, -1, :] # last position: shape = (num_particles, spatial_dimension)
         last_velocities = torch.diff(position_sequence, dim=1) # last C-1 velocities: shape = (num_particles, C-1, spatial_dimension)
@@ -108,8 +107,8 @@ class LearnedSimulator(nn.Module):
         ### Encoded node features
         # flattened most recent velocities
         node_features = []
-        velocity_stats = self.normalization_stats['vel']
-        normalized_velocities = (last_velocities - velocity_stats["mean"])/velocity_stats["std"] # shape = (num_particles, C-1, spatial_dimension)
+        
+        normalized_velocities = last_velocities/particle_radii.unsqueeze(-1) # shape = (num_particles, C-1, spatial_dimension)
         flat_normalized_velocities = normalized_velocities.view(num_particles, -1) # shape = (num_particles, (C-1)*spatial_dimension)
 
         node_features.append(flat_normalized_velocities)
@@ -119,20 +118,13 @@ class LearnedSimulator(nn.Module):
         distannce_to_lower_boundary = current_position - boundaries[:, 0] # shape = (num_particles, spatial_dimension);
         distannce_to_upper_boundary = boundaries[:, 1] - current_position # shape = (num_particles, spatial_dimension);
         distance_to_boundaries = torch.cat([distannce_to_lower_boundary, distannce_to_upper_boundary], dim=-1)
-        if self.use_particle_properties:
-            distance_to_boundaries = distance_to_boundaries/particle_radii # shape = (num_particles, 2*spatial_dimension); note that distance_to_boundaries is normalized by the particle radii.
-            # clamp the distance to boundaries to be within [-4, 4]a
-            distance_to_boundaries = torch.clamp(distance_to_boundaries, -4, 4) # shape = (num_particles, 2*spatial_dimension)
-        else:
-            distance_to_boundaries = distance_to_boundaries/self.connectivity_radius # shape = (num_particles, 2*spatial_dimension); note that distance_to_boundaries is normalized by the connectivity_radius.
-            # clamp the distance to boundaries to be within [-1, 1]connectivity_radius
-            distance_to_boundaries = torch.clamp(distance_to_boundaries, -1, 1) # shape = (num_particles, 2*spatial_dimension)
+        
+        normalized_distance_to_boundaries = distance_to_boundaries/particle_radii # shape = (num_particles, 2*spatial_dimension); note that distance_to_boundaries is normalized by the particle radii.
+        # clamp the distance to boundaries to be within [-4, 4]a
+        normalized_distance_to_boundaries = torch.clamp(normalized_distance_to_boundaries, -4, 4) # shape = (num_particles, 2*spatial_dimension)
         
         node_features.append(distance_to_boundaries)
-
-        # if self.use_particle_properties:
-        #     node_features.append(particle_radii)
-        
+    
         """
         num_node_features:
             rotation = False: (C-1)*spatial_dimension + 2*spatial_dimension+ 1
@@ -144,17 +136,23 @@ class LearnedSimulator(nn.Module):
         edge_features = []
         receivers, senders = self.compute_graph_connectivity(current_position, num_particles_per_example)
         # normalized relative displacements across edges
-        if self.use_particle_properties:
-            relative_displacements = (current_position[senders,:] - current_position[receivers,:])/(particle_radii[senders]+particle_radii[receivers]) # shape = (num_edges, spatial_dimension
-        else:
-            relative_displacements = (current_position[senders,:] - current_position[receivers,:])/self.connectivity_radius # shape = (num_edges, spatial_dimension)
+        
+        normalized_relative_displacements = (current_position[senders,:] - current_position[receivers,:])/(particle_radii[senders]+particle_radii[receivers]) # shape = (num_edges, spatial_dimension
 
-        distances = torch.norm(relative_displacements, dim=-1, keepdim=True) # shape = (num_edges, 1)
-        edge_features.append(torch.cat([relative_displacements, distances], dim=-1))
+        normalized_distances = torch.norm(normalized_relative_displacements, dim=-1, keepdim=True) # shape = (num_edges, 1)
+        edge_features.append(torch.cat([normalized_relative_displacements, normalized_distances], dim=-1))
+
+        normalized_relative_velocities = (last_velocities[senders] - last_velocities[receivers])/(particle_radii[senders]+particle_radii[receivers]).unsqueeze(-1) # shape = (num_edges, C-1, spatial_dimension)
+        num_edges = len(receivers)
+        flat_normalized_relative_velocities = normalized_relative_velocities.view(num_edges, -1) # shape = (num_edges, (C-1)*spatial_dimension)
+        edge_features.append(flat_normalized_relative_velocities)
+        # normalized_absolute_relative_velocities = torch.norm(normalized_relative_velocities, dim=-1, keepdim=True) # shape = (num_edges, C-1, 1)
+        # flat_normalized_absolute_relative_velocities = normalized_absolute_relative_velocities.view(num_edges, -1) # shape = (num_edges, (C-1))
+        # edge_features.append(flat_normalized_absolute_relative_velocities)
         """
         num_edge_features:
-            rotation = False: spatial_dimension + 1
-            rotation = True: spatial_dimension + 1 + ...
+            rotation = False: spatial_dimension + 1 + (C-1)*spatial_dimension
+            rotation = True: spatial_dimension + 1 + (C-1)*spatial_dimension ...
         """
 
         # node_features is a list with element of shape (num_particles, N1), (num_particles, N2), ... . torch.cat(node_features, dim=-1) will concatenate these elements along the last dimension to get a shape of (num_particles, N1+N2+...). A similar scenario holds for edge_features.
@@ -162,19 +160,17 @@ class LearnedSimulator(nn.Module):
         return torch.cat(node_features,dim=-1), torch.cat(edge_features, dim=-1), torch.stack([senders, receivers])
 
     def decoder_postprocessor(self,
-                              normalized_acceleration: torch.tensor,
+                              acceleration: torch.tensor,
                               position_sequence: torch.tensor):
         """
         This internal method computes the predicted positions of the particles given the normalized accelerations and the current positions.
         Arguments:
-            normalized_acceleration: tensor of shape (num_particles, spatial_dimension)
-            position_sequence: tensor of shape (num_particles, c>1, spatial_dimension).
+            acceleration: tensor of shape (num_particles, spatial_dimension)
+            position_sequence: tensor of shape (num_particles, C>1, spatial_dimension).
         
         Returns:
             predicted_positions: tensor of shape (num_particles, spatial_dimension)
         """
-        acceleration_stats = self.normalization_stats['acc']
-        acceleration = normalized_acceleration*acceleration_stats['std'] + acceleration_stats['mean']
         # Use an Euler integrator to go from acceleration to position
         # RF: NEEDS TO BE FIXED; assumes dt = 1
         most_recent_position = position_sequence[:, -1, :]
@@ -199,7 +195,8 @@ class LearnedSimulator(nn.Module):
         """
         node_features, edge_features, edges = self.encoder_preprocessor(position_sequence, num_particles_per_example, particle_properties)
         predicted_normalized_acceleration = self.encoder_processor_decoder(node_features, edge_features, edges)
-        predicted_position = self.decoder_postprocessor(predicted_normalized_acceleration, position_sequence)
+        particle_radii = self.get_particle_radii(particle_properties)
+        predicted_position = self.decoder_postprocessor(predicted_normalized_acceleration*particle_radii, position_sequence)
         return predicted_position
 
 
@@ -224,9 +221,9 @@ class LearnedSimulator(nn.Module):
         noisy_position_sequence = position_sequence + position_sequence_noise
         node_features, edge_features, edges = self.encoder_preprocessor(noisy_position_sequence, num_particles_per_example, particle_properties)
         predicted_normalized_acceleration = self.encoder_processor_decoder(node_features, edge_features, edges)
-
         next_position_adjusted = next_position + position_sequence_noise[:,-1,:] # ensures that the velocity is being computed noise free; acceleration will still be noisy however. An alternative is to let next_position_adjusted = next_positions + position_sequence_noise[:, -1] + (position_sequence_noise[:, -1] - position_sequence_noise[:, -2]), which ensures that the acceleration is noise free.
-        target_normalized_acceleration = self.inverse_decoder_postprocessor(next_position_adjusted, noisy_position_sequence)
+        particle_radii = self.get_particle_radii(particle_properties)
+        target_normalized_acceleration = self.inverse_decoder_postprocessor(next_position_adjusted/particle_radii, noisy_position_sequence/particle_radii.unsqueeze(-1))
 
         return predicted_normalized_acceleration, target_normalized_acceleration
 
@@ -241,9 +238,9 @@ class LearnedSimulator(nn.Module):
         next_velocity = next_position_adjusted - last_position # this is the true velocity
         acceleration = next_velocity - last_velocity # wil include the noise due to last_velocity being noisy
 
-        acceleration_stats = self.normalization_stats["acc"]
-        normalized_acceleration = (acceleration - acceleration_stats['mean'])/acceleration_stats['std']
-        return normalized_acceleration
+        # acceleration_stats = self.normalization_stats["acc"]
+        # normalized_acceleration = (acceleration - acceleration_stats['mean'])/acceleration_stats['std']
+        return acceleration
 
 
     def save(self, path: str = 'model.pt'):
