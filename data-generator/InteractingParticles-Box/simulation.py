@@ -87,9 +87,9 @@ def collision(wallpos, direction, nhat, dt, x, v, index, gamma, alpha, F_ext):
 
 num_trajectories = 2
 data_category = 'test'
-np.random.seed(123) # train: 1; valid: 12; test: 123
+np.random.seed(12357) # train: 1; valid: 123; test: 12357
 for tr in range(num_trajectories):
-    N = np.random.randint(20, 23, 1).item()
+    N = np.random.randint(27, 30, 1).item()
     DIM = (N,2);
     ### Extenral force
     F_ext = np.zeros(DIM);
@@ -120,7 +120,7 @@ for tr in range(num_trajectories):
     curve = ax.scatter(10, 10, s=points_radius**2, color='r')
 
     dt = 0.01; # time step
-    tf = 10  ; # total simulation time
+    tf = 15  ; # total simulation time
     tM = int(tf/dt); # number of time steps
     t = np.linspace(0,tf,tM);
     position = np.zeros((tM,DIM[0],DIM[1]))
@@ -187,7 +187,7 @@ for tr in range(num_trajectories):
     plt.close()
     
     data_tuple = np.empty(2, dtype=object)
-    data_tuple[0] = position/L # normalized
+    data_tuple[0] = position[0:-1:2,:,:]/L # normalized
     data_tuple[1] = particle_properties
     np.save(f"{data_category}{tr}.npy", data_tuple)
 
@@ -206,34 +206,34 @@ np.savez(f"{data_category}.npz", **data_dict)
 os.system("rm *.npy")
 
 if data_category == 'train':
-    train_data = np.load('train.npz', allow_pickle=True)
-    num_trajectories = len(train_data.files)
-    vel_mean_vec = np.zeros((num_trajectories,2))
-    vel_std_vec = np.zeros((num_trajectories,2))
-    acc_mean_vec = np.zeros((num_trajectories,2))
-    acc_std_vec = np.zeros((num_trajectories,2))
-    for idx in range(len(train_data.files)):
-        st=train_data[f'simulation_trajectory_{idx}']
-        position = st[0]
-        num_steps = position.shape[0]
-        N = position.shape[1]
-        vel = np.zeros((num_steps,N,2))
-        acc = np.zeros((num_steps,N,2))
-        for i in range(1,num_steps):
-            vel[i,:,:] = (position[i,:,:]-position[i-1,:,:])/dt
+    # train_data = np.load('train.npz', allow_pickle=True)
+    # num_trajectories = len(train_data.files)
+    # vel_mean_vec = np.zeros((num_trajectories,2))
+    # vel_std_vec = np.zeros((num_trajectories,2))
+    # acc_mean_vec = np.zeros((num_trajectories,2))
+    # acc_std_vec = np.zeros((num_trajectories,2))
+    # for idx in range(len(train_data.files)):
+    #     st=train_data[f'simulation_trajectory_{idx}']
+    #     position = st[0]
+    #     num_steps = position.shape[0]
+    #     N = position.shape[1]
+    #     vel = np.zeros((num_steps,N,2))
+    #     acc = np.zeros((num_steps,N,2))
+    #     for i in range(1,num_steps):
+    #         vel[i,:,:] = (position[i,:,:]-position[i-1,:,:])/dt
 
-        for i in range(1,num_steps-1):
-            acc[i,:,:] = (position[i+1,:,:]-2*position[i,:,:]+position[i-1,:,:])/(dt**2)
+    #     for i in range(1,num_steps-1):
+    #         acc[i,:,:] = (position[i+1,:,:]-2*position[i,:,:]+position[i-1,:,:])/(dt**2)
         
-        vel = vel[2:,:,:]
-        acc = acc[1:-1,:,:]
-        vel_mean_vec[idx], vel_std_vec[idx] = np.mean(vel, axis=(0,1)), np.std(vel, axis=(0,1))
-        acc_mean_vec[idx], acc_std_vec[idx] = np.mean(acc, axis=(0,1)), np.std(acc, axis=(0,1))
+    #     vel = vel[2:,:,:]
+    #     acc = acc[1:-1,:,:]
+    #     vel_mean_vec[idx], vel_std_vec[idx] = np.mean(vel, axis=(0,1)), np.std(vel, axis=(0,1))
+    #     acc_mean_vec[idx], acc_std_vec[idx] = np.mean(acc, axis=(0,1)), np.std(acc, axis=(0,1))
 
-    vel_mean = np.mean(vel_mean_vec, axis=0)
-    acc_mean = np.mean(acc_mean_vec, axis=0)
-    vel_std = np.mean(vel_std_vec**2+(vel_mean_vec-vel_mean)**2, axis=0)
-    acc_std = np.mean(acc_std_vec**2+(acc_mean_vec-acc_mean)**2, axis=0)
+    # vel_mean = np.mean(vel_mean_vec, axis=0)
+    # acc_mean = np.mean(acc_mean_vec, axis=0)
+    # vel_std = np.mean(vel_std_vec**2+(vel_mean_vec-vel_mean)**2, axis=0)
+    # acc_std = np.mean(acc_std_vec**2+(acc_mean_vec-acc_mean)**2, axis=0)
 
     import json
     data = np.load('train.npz', allow_pickle=True)
@@ -246,14 +246,7 @@ if data_category == 'train':
     # Define the metadata dictionary
     metadata = {
         "bounds": [[-1, 1], [-1, 1]],
-        "sequence_length": num_steps,
         "default_connectivity_radius": default_connectivity_radius,
-        "dim": 2,
-        "dt": dt,
-        "vel_mean": vel_mean.tolist(),
-        "vel_std": vel_std.tolist(),
-        "acc_mean": acc_mean.tolist(),
-        "acc_std": acc_std.tolist(),
         "boxSize": L
     }
 
