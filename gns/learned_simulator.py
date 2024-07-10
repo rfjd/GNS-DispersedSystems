@@ -29,10 +29,12 @@ class LearnedSimulator(nn.Module):
                  num_encoded_edge_features: int = 128,
                  num_mlp_layers: int = 2,
                  mlp_layer_size: int = 128,
-                 device="cpu"):
+                 device="cpu",
+                 rMax: float = 4.0):
         super().__init__()
         self.connectivity_radius = connectivity_radius
         self.boundaries = boundaries
+        self.rMax = rMax
         
         self.output_node_size = spatial_dimension + 1 if rotation else spatial_dimension
         self.encoder_processor_decoder = network_architecture.EncoderProcessorDecoder(
@@ -120,8 +122,8 @@ class LearnedSimulator(nn.Module):
         distance_to_boundaries = torch.cat([distannce_to_lower_boundary, distannce_to_upper_boundary], dim=-1)
         
         normalized_distance_to_boundaries = distance_to_boundaries/particle_radii # shape = (num_particles, 2*spatial_dimension); note that distance_to_boundaries is normalized by the particle radii.
-        # clamp the distance to boundaries to be within [-4, 4]a
-        normalized_distance_to_boundaries = torch.clamp(normalized_distance_to_boundaries, -4, 4) # shape = (num_particles, 2*spatial_dimension)
+        # clamp the distance to boundaries to be within [-rMax, rMax]
+        normalized_distance_to_boundaries = torch.clamp(normalized_distance_to_boundaries, -self.rMax, self.rMax) # shape = (num_particles, 2*spatial_dimension)
         
         node_features.append(distance_to_boundaries)
     
