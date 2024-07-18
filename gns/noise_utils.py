@@ -12,7 +12,7 @@ def get_random_walk_noise_for_position_sequence(position_sequence: torch.tensor,
     Returns:
         random_walk_position_sequence_noise: the noise in the position sequence.
     """
-    velocity_sequence = torch.diff(position_sequence, dim=1) # assuming dt=1
+    velocity_sequence = torch.diff(position_sequence, dim=1) # assuming dt=1; note that only the shape (and not the values) of the velocity_sequence is used in this function
     num_velocities = velocity_sequence.shape[1] # C-1; number of random walk steps
     std_each_step = noise_std_last_step/num_velocities**0.5 # Variance of sum of independent random variables is the sum of their variances: \mathrm{Var}(v_1, v_2, ..., v_C) = \sum_{i=1}^{C} \mathrm{Var}(v_i) \Rightarrow \sigma_{\text{each step}} = \frac{\sigma_{\text{last step}}}{\sqrt{C-1}}
     velocity_sequence_noise = torch.randn(list(velocity_sequence.shape))*std_each_step
