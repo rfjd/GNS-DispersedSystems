@@ -73,9 +73,9 @@ class Render():
         # color mask for visualization for different material types
         color_map = np.empty(self.num_particles, dtype="object")
         for material_id, color in TYPE_TO_COLOR.items():
-            print(material_id, color)
+            # print(material_id, color)
             color_index = np.where(np.array(self.particle_type) == material_id)
-            print(color_index)
+            # print(color_index)
             color_map[color_index] = color
         color_map = list(color_map)
         return "blue"
@@ -115,11 +115,16 @@ class Render():
         top_margin = 0.5
         bottom_margin = 0.5
         horizontal_spacing = 0.75
+        # print(self.particle_properties)
+        if len(list(self.particle_properties.shape)) == 1:
+            particle_radii = self.particle_properties # shape = (num_particles,)
+        else:
+            particle_radii = self.particle_properties[:,0] # shape = (num_particles,)
 
         # calculate point size for scatter plot
         boxSize = self.rollout_data["metadata"]["boxSize"]
         points_whole_ax = subplot_width*0.8*72# 1 point = dpi / 72 pixels
-        points_radius = 1/boxSize*points_whole_ax
+        points_radius = particle_radii*points_whole_ax
         point_size = points_radius**2
         
         # Calculate the overall figure size
@@ -138,8 +143,8 @@ class Render():
         # Define datacase name
         trajectory_datacases = [self.rollout_cases[0][0], self.rollout_cases[1][0]]
         render_datacases = [self.rollout_cases[0][1], self.rollout_cases[1][1]]
-        print(f"trajectory_datacases: {trajectory_datacases}") # grund truth rollout, predicted rollout
-        print(f"self.trajectory.shape={self.trajectory[trajectory_datacases[0]].shape}")
+        # print(f"trajectory_datacases: {trajectory_datacases}") # grund truth rollout, predicted rollout
+        # print(f"self.trajectory.shape={self.trajectory[trajectory_datacases[0]].shape}")
         # Get color mask for visualization
         color_mask = self.color_mask()
 
@@ -151,7 +156,7 @@ class Render():
                 axes[j].cla()
                 # for mask, color in color_mask:
                 axes[j].scatter(self.trajectory[datacase][i,:,0],
-                                    self.trajectory[datacase][i,:,1], s=point_size, color="blue")
+                                    self.trajectory[datacase][i,:,1], s=point_size, color="blue", edgecolor="k")
                 axes[j].grid(True, which='both')
                 axes[j].set_title(render_datacases[j])
                 axes[j].set_xlim([float(xboundary[0]), float(xboundary[1])])
