@@ -101,17 +101,17 @@ def collision(wallpos, direction, nhat, dt, x, v, a, index, F_ext):
 
 ### Simulation
 multidisperse = False
-a_values = [1e-2, 1e-2]# [5e-3, 6e-3, 7e-3, 8e-3, 9e-3, 1e-2]
-data_category = 'train'
+a_values = [5e-3, 5e-3, 5e-3, 5e-3, 5e-3]# [5e-3, 6e-3, 7e-3, 8e-3, 9e-3, 1e-2]
+data_category = 'test'
 if data_category == 'test':
     np.random.seed(123)
     if ~multidisperse:
         num_trajectories = len(a_values)
     else:
-        num_trajectories = 2
+        num_trajectories = len(a_values)
 else:
     np.random.seed(1)
-    num_trajectories = 16
+    num_trajectories = 32
     
 save_step = 10
 for tr in range(num_trajectories):
