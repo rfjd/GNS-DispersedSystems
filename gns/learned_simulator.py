@@ -125,8 +125,8 @@ class LearnedSimulator(nn.Module):
         # clamp the distance to boundaries to be within [-rMax, rMax]
         normalized_distance_to_boundaries = torch.clamp(normalized_distance_to_boundaries, -self.rMax, self.rMax) # shape = (num_particles, 2*spatial_dimension)
         
-        node_features.append(distance_to_boundaries)
-    
+        node_features.append(normalized_distance_to_boundaries)
+        node_features.append(particle_radii) # shape = (num_particles, 1)
         """
         num_node_features:
             rotation = False: (C-1)*spatial_dimension + 2*spatial_dimension+ 1
@@ -148,6 +148,7 @@ class LearnedSimulator(nn.Module):
         num_edges = len(receivers)
         flat_normalized_relative_velocities = normalized_relative_velocities.view(num_edges, -1) # shape = (num_edges, (C-1)*spatial_dimension)
         edge_features.append(flat_normalized_relative_velocities)
+        edge_features.append(particle_radii[senders]+particle_radii[receivers]) # shape = (num_edges, 1)
         # normalized_absolute_relative_velocities = torch.norm(normalized_relative_velocities, dim=-1, keepdim=True) # shape = (num_edges, C-1, 1)
         # flat_normalized_absolute_relative_velocities = normalized_absolute_relative_velocities.view(num_edges, -1) # shape = (num_edges, (C-1))
         # edge_features.append(flat_normalized_absolute_relative_velocities)
