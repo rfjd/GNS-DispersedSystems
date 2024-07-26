@@ -164,7 +164,7 @@ class Render():
             # fig.suptitle(f"{i}/{self.num_steps}, Total MSE: {self.loss:.2e}")
 
         # Creat animation
-        ani = animation.FuncAnimation(fig, animate, frames=np.arange(0, self.num_steps, timestep_stride), interval=10)
+        ani = animation.FuncAnimation(fig, animate, frames=np.arange(0, self.num_steps, timestep_stride), interval=5)
 
         ani.save(f'{self.output_dir}{self.output_name}.gif', dpi=100, fps=30, writer='imagemagick')
         print(f"Animation saved to: {self.output_dir}{self.output_name}.gif")
