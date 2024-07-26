@@ -28,7 +28,7 @@ from gns import distribute
 flags.DEFINE_enum(
     'mode', 'train', ['train', 'valid', 'rollout'],
     help='Train model, validation or rollout evaluation.')
-flags.DEFINE_integer('batch_size', 2, help='The batch size.')
+flags.DEFINE_integer('batch_size', 1, help='The batch size.')
 flags.DEFINE_float('noise_std', 6.7e-4, help='The std deviation of the noise.')
 flags.DEFINE_string('data_path', None, help='The dataset directory.')
 flags.DEFINE_string('model_path', 'models/', help=('The path for saving checkpoints of the model.'))
@@ -68,8 +68,8 @@ NUM_MLP_LAYERS = FLAGS.NUM_MLP_LAYERS
 MLP_LAYER_SIZE = FLAGS.MLP_LAYER_SIZE
 NUM_MESSAGE_PASSING_STEPS = FLAGS.NUM_MESSAGE_PASSING_STEPS
 SPATIAL_DIMENSION = FLAGS.SPATIAL_DIMENSION
-NUM_NODE_FEATURES = (C-1)*2+2*SPATIAL_DIMENSION # e.g., C = 6: 5*2+2*2 = 14
-NUM_EDGE_FEATURES = (C-1)*2+3 # e.g., C = 6: 5*2+3 = 13
+NUM_NODE_FEATURES = (C-1)*2+2*SPATIAL_DIMENSION+1 # e.g., C = 6: 5*2+2*2+1 = 15
+NUM_EDGE_FEATURES = (C-1)*2+3+1 # e.g., C = 6: 5*2+3+1 = 14
 
 def rollout(simulator: learned_simulator.LearnedSimulator,
             position_sequence: torch.tensor,
