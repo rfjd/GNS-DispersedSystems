@@ -8,11 +8,7 @@
 *gz
 stuff/
 .ipynb_checkpoints/
-*.npz
-*.npy
-*.json
 *#
 *__pycache__*
 venv/
-RUNS-temp/
 stuff/
