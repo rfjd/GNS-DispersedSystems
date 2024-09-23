@@ -11,12 +11,12 @@ rho = 2300
 rho_f = 1000
 g = 9.8066
 L = 10e-2
-k = 1
+k = 1.25
 
 p = 6
-U0_coeff = 0.05 #
+U0_coeff = 0.025 #
 r_m_coeff = 1.75 # multiplied by min[a_i,a_j] gives r_m
-R_coeff = np.power(2,1/p) # multiplied by sigma gives r_m
+R_coeff = np.power(2,1/p) # multiplied by sigma gives R
 
 gamma = 0.8
 
@@ -72,7 +72,7 @@ def Fi(x,a,i):
     R = 2*R_coeff*np.maximum(a[i],a).reshape((N,1)) # shape (N,1)
     r_mMod = np.delete(r_m,i,0); #shape (N-1,1)
     RMod = np.delete(R,i,0); #shape (N-1,1)
-    ForceVec = -dUdr(r_mMod,sigmaMod,U0Mod)*diffMod/rMod*(rMod<=r_mMod)-dUdr(rMod,sigmaMod,U0Mod)*diffMod/rMod*(rMod>r_mMod)*(rMod<=RMod) # shape (N-1,2)
+    ForceVec = -dUdr(r_mMod,sigmaMod,U0Mod)*diffMod/rMod*(rMod<=r_mMod)-dUdr(rMod,sigmaMod,U0Mod)*diffMod/rMod*(rMod>r_mMod)#*(rMod<=RMod) # shape (N-1,2)
     return np.sum(ForceVec,axis=0);
 
 def FVec(x,a):
@@ -100,22 +100,22 @@ def collision(wallpos, direction, nhat, dt, x, v, a, index, F_ext):
 
 
 ### Simulation
-multidisperse = False
-a_values = [5e-3, 5e-3, 5e-3, 5e-3, 5e-3]# [5e-3, 6e-3, 7e-3, 8e-3, 9e-3, 1e-2]
+multidisperse = True
+a_values = [2e-3, 2.5e-3, 3e-3, 3.5e-3, 4e-3, 4.5e-3, 5e-3]
 data_category = 'test'
 if data_category == 'test':
     np.random.seed(123)
-    if ~multidisperse:
-        num_trajectories = len(a_values)
+    if multidisperse:
+        num_trajectories = 6
     else:
         num_trajectories = len(a_values)
 else:
     np.random.seed(1)
-    num_trajectories = 32
+    num_trajectories = 16
     
-save_step = 10
+save_step = 15
 for tr in range(num_trajectories):
-    packing = 0.5
+    packing = 0.7
     y0 = np.random.uniform(-0.25*L,0,1).item()
     if multidisperse:
         Nmax = 2*L*(L-y0)/(4*max(a_values)**2)
@@ -157,7 +157,7 @@ for tr in range(num_trajectories):
     curve = ax.scatter(10, 10, s=10, color='r')
 
     dt = 0.0001; # time step
-    tf = 0.5   ; # total simulation time
+    tf = 0.75  ; # total simulation time
     tM = int(tf/dt); # number of time steps
     t = np.linspace(0,tf,tM);
     position = np.zeros((tM,DIM[0],DIM[1]))
@@ -271,7 +271,7 @@ if data_category == 'train':
         radii.append(data[f'simulation_trajectory_{example}'][1])
 
     max_radius = np.max(np.concatenate(radii))
-    default_connectivity_radius = 4*R_coeff*max_radius
+    default_connectivity_radius = 4*max_radius
     dt_save = save_step*dt
     # Define the metadata dictionary
     metadata = {
