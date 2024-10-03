@@ -4,7 +4,7 @@ NUM_MESSAGE_PASSING_STEPS=10
 NUM_ENCODED_NODE_FEATURES=128
 NUM_ENCODED_EDGE_FEATURES=128
 MLP_LAYER_SIZE=128
-number_steps=1000000
+number_steps=2000000
 
 DATASET_NAME="SpheresBox-Multidisperse-DENSE-16"
 
@@ -33,3 +33,6 @@ for case in $(seq 0 5); do
 	python3 -m gns.render_rollout_particles2D --rollout_dir="${ROLLOUT_PATH}" --rollout_name="rollout_ex${case}" --step_stride=3
 	mv ${ROLLOUT_PATH}/rollout_ex$case.gif ${ROLLOUT_PATH}/rollout_ex$case-${number_steps}.gif
 done
+
+cp run.bash "$DIR/$DATASET_NAME/"
+cp gns/main.py "$DIR/$DATASET_NAME/"

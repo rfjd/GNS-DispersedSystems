@@ -43,7 +43,8 @@ flags.DEFINE_integer('nsave_steps', int(50000), help='Number of steps at which t
 # Learning rate parameters
 flags.DEFINE_float('lr_init', 1e-4, help='Initial learning rate.')
 flags.DEFINE_float('lr_decay', 0.1, help='Learning rate decay.')
-flags.DEFINE_integer('lr_decay_steps', int(5e6), help='Learning rate decay steps.')
+# flags.DEFINE_integer('lr_decay_steps', int(5e6), help='Learning rate decay steps.')
+flags.DEFINE_integer('lr_decay_steps', int(2e5), help='Learning rate decay steps.')
 
 flags.DEFINE_integer("cuda_device_number", None, help="CUDA device (zero indexed), default is None so default CUDA device will be used.")
 flags.DEFINE_integer("n_gpus", 1, help="The number of GPUs to utilize for training")
@@ -364,7 +365,10 @@ def train(rank, flags, world_size, device):
                 optimizer.step()
 
                 # Update learning rate
+                # exponential decay
                 lr_new = flags["lr_init"]*(flags["lr_decay"] ** (step/flags["lr_decay_steps"])) * world_size
+                # # step decay
+                # lr_new = flags["lr_init"]*(flags["lr_decay"]**(step//flags["lr_decay_steps"])) * world_size
                 for param in optimizer.param_groups:
                     param['lr'] = lr_new
 
