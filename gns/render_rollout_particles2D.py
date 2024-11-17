@@ -16,16 +16,6 @@ flags.DEFINE_integer("step_stride", 10, help="Stride of steps to skip")
 
 FLAGS = flags.FLAGS
 
-TYPE_TO_COLOR = {
-    0: "red",
-    1: "black",  # Boundary particles.
-    2: "green",
-    3: "magenta",
-    4: "gold",
-    5: "blue",
-}
-
-
 class Render():
     """
     Render rollout data into gif or vtk files
@@ -65,31 +55,6 @@ class Render():
         self.num_steps = trajectory[rollout_cases[0][0]].shape[0]
         self.boundaries = rollout_data["metadata"]["bounds"]
         self.particle_properties = rollout_data["particle_properties"]
-
-    def color_map(self):
-        """
-        Get color map array for each particle type for visualization
-        """
-        # color mask for visualization for different material types
-        color_map = np.empty(self.num_particles, dtype="object")
-        for material_id, color in TYPE_TO_COLOR.items():
-            # print(material_id, color)
-            color_index = np.where(np.array(self.particle_type) == material_id)
-            # print(color_index)
-            color_map[color_index] = color
-        color_map = list(color_map)
-        return "blue"
-
-    def color_mask(self):
-        """
-        Get color mask and corresponding colors for visualization
-        """
-        color_mask = []
-        # for material_id, color in TYPE_TO_COLOR.items():
-        #     mask = np.array(self.particle_type) == material_id
-        #     if mask.any() == True:
-        #         color_mask.append([mask, color])
-        return color_mask
 
     def render_gif_animation(self, timestep_stride=3, vertical_camera_angle=20, viewpoint_rotation=0.5):
         """
@@ -146,7 +111,7 @@ class Render():
         # print(f"trajectory_datacases: {trajectory_datacases}") # grund truth rollout, predicted rollout
         # print(f"self.trajectory.shape={self.trajectory[trajectory_datacases[0]].shape}")
         # Get color mask for visualization
-        color_mask = self.color_mask()
+        color_mask = [] #self.color_mask()
 
         # Fig creating function for 2d
         
