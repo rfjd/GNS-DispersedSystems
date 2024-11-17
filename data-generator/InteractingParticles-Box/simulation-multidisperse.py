@@ -101,7 +101,8 @@ def collision(wallpos, direction, nhat, dt, x, v, a, index, F_ext):
 
 ### Simulation
 multidisperse = True
-a_values = [2e-3, 2.5e-3, 3e-3, 3.5e-3, 4e-3, 4.5e-3, 5e-3]
+# a_values = [2e-3, 2.5e-3, 3e-3, 3.5e-3, 4e-3, 4.5e-3, 5e-3]
+a_values = [2e-3, 2.25e-3, 2.75e-3, 3.25e-3, 3.75e-3, 4.25e-3, 4.75e-3, 5e-3]
 data_category = 'test'
 if data_category == 'test':
     np.random.seed(123)
