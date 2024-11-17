@@ -6,7 +6,7 @@ NUM_ENCODED_EDGE_FEATURES=128
 MLP_LAYER_SIZE=128
 number_steps=2000000
 
-DATASET_NAME="SpheresBox-Multidisperse-DENSE-16"
+DATASET_NAME="multidisperse-sedimentation"
 
 DATA_PATH="data/$DATASET_NAME/"
 FLAGS="--C=$C --NUM_MESSAGE_PASSING_STEPS=$NUM_MESSAGE_PASSING_STEPS --NUM_ENCODED_NODE_FEATURES=$NUM_ENCODED_NODE_FEATURES --NUM_ENCODED_EDGE_FEATURES=$NUM_ENCODED_EDGE_FEATURES --MLP_LAYER_SIZE=$MLP_LAYER_SIZE"
@@ -15,8 +15,8 @@ FLAGS="--C=$C --NUM_MESSAGE_PASSING_STEPS=$NUM_MESSAGE_PASSING_STEPS --NUM_ENCOD
 # OUT_DIR="$DIR/$DATASET_NAME-$OUT_DIR/"
 # MODEL_PATH="$OUT_DIR/models/"
 # ROLLOUT_PATH="$OUT_DIR/rollout/"
-MODEL_PATH="$DIR/$DATASET_NAME/models/"
-ROLLOUT_PATH="$DIR/$DATASET_NAME/rollout/"
+MODEL_PATH="$DIR/temprun/models/"
+ROLLOUT_PATH="$DIR/temprun/rollout/test/"
 
 mkdir -p ${MODEL_PATH}
 mkdir -p ${ROLLOUT_PATH}
@@ -34,5 +34,5 @@ for case in $(seq 0 5); do
 	mv ${ROLLOUT_PATH}/rollout_ex$case.gif ${ROLLOUT_PATH}/rollout_ex$case-${number_steps}.gif
 done
 
-cp run.bash "$DIR/$DATASET_NAME/"
-cp gns/main.py "$DIR/$DATASET_NAME/"
+cp run.bash "$DIR/temprun/"
+cp gns/main.py "$DIR/temprun/"

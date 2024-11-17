@@ -31,7 +31,7 @@ flags.DEFINE_enum(
 flags.DEFINE_integer('batch_size', 2, help='The batch size.') # indicates how many of the examples are processed at once
 flags.DEFINE_float('noise_std', 5e-4, help='The std deviation of the noise.')
 flags.DEFINE_string('data_path', None, help='The dataset directory.')
-falgs.DEFINE_string('testfilename', 'test', help='The name of the test file.')
+flags.DEFINE_string('testfilename', 'test', help='The name of the test file.')
 flags.DEFINE_string('model_path', 'models/', help=('The path for saving checkpoints of the model.'))
 flags.DEFINE_string('output_path', 'rollouts/', help='The path for saving outputs (e.g. rollouts).')
 flags.DEFINE_string('output_filename', 'rollout', help='Base name for saving the rollout')
