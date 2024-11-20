@@ -6,6 +6,7 @@ from matplotlib import animation
 import matplotlib.pyplot as plt
 import numpy as np
 import matplotlib as mpl
+from scipy.io import savemat
 
 flags.DEFINE_string("rollout_dir", None, help="Directory where rollout.pkl are located")
 flags.DEFINE_string("rollout_name", None, help="Name of rollout .pkl file")
@@ -106,15 +107,26 @@ class Render():
         print(f"Animation saved to: {self.output_dir}{self.output_name}.gif")
 
 
+    def save_trajectory_to_mat(self):
+        trajectory_data = {
+            "ground_truth_rollout": self.trajectory["ground_truth_rollout"],
+            "predicted_rollout": self.trajectory["predicted_rollout"],
+            "particle_radii": self.particle_properties,
+            "metadata": self.rollout_data["metadata"]
+        }
+        savemat(f'{self.output_dir}{self.output_name}.mat', trajectory_data)
+        print(f"Trajectory saved to: {self.output_dir}{self.output_name}.mat")
+
+
 def main(_):
     if not FLAGS.rollout_dir:
         raise ValueError("A rollout_dir must be passed.")
     if not FLAGS.rollout_name:
         raise ValueError("A rollout_namemust be passed.")
 
-    render = Render(input_dir=FLAGS.rollout_dir, input_name=FLAGS.rollout_name)
-              
+    render = Render(input_dir=FLAGS.rollout_dir, input_name=FLAGS.rollout_name)          
     render.render_gif_animation(timestep_stride=FLAGS.step_stride)
-
+    render.save_trajectory_to_mat()
+    
 if __name__ == '__main__':
     app.run(main)
