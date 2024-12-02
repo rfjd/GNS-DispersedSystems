@@ -12,3 +12,4 @@ stuff/
 *__pycache__*
 venv/
 stuff/
+test/

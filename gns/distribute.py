@@ -4,7 +4,7 @@ seed_util.apply_seed()
 import torch
 from torch.utils.data.distributed import DistributedSampler
 
-from gns import data_loader, data_loader_AK
+from gns import data_loader
 
 def setup(rank, world_size, device):
     """Initializes distributed training.
@@ -52,9 +52,6 @@ def get_data_distributed_dataloader_by_samples(path, input_length_sequence, batc
         shuffle (bool): Whether to shuffle dataset.
     """
     dataset = data_loader.SamplesDataset(path, input_length_sequence)
-    # dataset = data_loader_AK.TrajectoriesSampleDataset(path, input_length_sequence)
     sampler = DistributedSampler(dataset, shuffle=shuffle)
     return torch.utils.data.DataLoader(dataset=dataset, sampler=sampler, batch_size=batch_size,
                                        pin_memory=True, collate_fn=data_loader.collate_fn)
-    # return torch.utils.data.DataLoader(dataset=dataset, sampler=sampler, batch_size=batch_size,
-    #                                    pin_memory=True, collate_fn=data_loader_AK.collate_trajectories_sample_batch)

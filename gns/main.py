@@ -25,9 +25,7 @@ from gns import data_loader
 from gns import distribute
 
 # Define the flags and their default values
-flags.DEFINE_enum(
-    'mode', 'train', ['train', 'valid', 'rollout'],
-    help='Train model, validation or rollout evaluation.')
+flags.DEFINE_enum('mode', 'train', ['train', 'rollout'], help='Train model, validation or rollout evaluation.')
 flags.DEFINE_integer('batch_size', 2, help='The batch size.') # indicates how many of the examples are processed at once
 flags.DEFINE_float('noise_std', 5e-4, help='The std deviation of the noise.')
 flags.DEFINE_string('data_path', None, help='The dataset directory.')
@@ -37,14 +35,12 @@ flags.DEFINE_string('output_path', 'rollouts/', help='The path for saving output
 flags.DEFINE_string('output_filename', 'rollout', help='Base name for saving the rollout')
 flags.DEFINE_string('model_file', None, help=('Model filename (.pt) to resume from. Can also use "latest" to default to newest file.'))
 flags.DEFINE_string('train_state_file', 'train_state.pt', help=('Train state filename (.pt) to resume from. Can also use "latest" to default to newest file.'))
-
 flags.DEFINE_integer('ntraining_steps', int(2E7), help='Number of training steps.')
 flags.DEFINE_integer('nsave_steps', int(50000), help='Number of steps at which to save the model.')
 
 # Learning rate parameters
 flags.DEFINE_float('lr_init', 1e-4, help='Initial learning rate.')
 flags.DEFINE_float('lr_decay', 0.1, help='Learning rate decay.')
-# flags.DEFINE_integer('lr_decay_steps', int(5e6), help='Learning rate decay steps.')
 flags.DEFINE_integer('lr_decay_steps', int(2e5), help='Learning rate decay steps.')
 
 flags.DEFINE_integer("cuda_device_number", None, help="CUDA device (zero indexed), default is None so default CUDA device will be used.")
@@ -77,8 +73,7 @@ def rollout(simulator: learned_simulator.LearnedSimulator,
             position_sequence: torch.tensor,
             particle_properties: torch.tensor,
             num_particles_per_example: torch.tensor,
-            num_steps: int,
-            device: torch.device):
+            num_steps: int):
     """
     Generate a rollout using the first C steps of the position_sequence
     Argumentss:
@@ -116,35 +111,23 @@ def rollout(simulator: learned_simulator.LearnedSimulator,
     return rollout_dict, loss
 
 
-def get_simulator(metadata: json,
-                  acc_noise_std: float,
-                  vel_noise_std: float,
-                  device: torch.device):
+def get_simulator(metadata: json, device: torch.device):
     """
     Instantiates the learned simulator.
 
     Args:
       metadata: JSON object with metadata.
-      acc_noise_std: Acceleration noise std deviation.
-      vel_noise_std: Velocity noise std deviation.
       device: PyTorch device 'cpu' or 'cuda'.
 
     Returns:
       simulator: LearnedSimulator object
     """
 
-    # RF why do we need to add noise to the std deviation?
-    # normalization_stats = {
-    #     'acc': {'mean': torch.FloatTensor(metadata['acc_mean']).to(device),'std': torch.sqrt(torch.FloatTensor(metadata['acc_std'])**2 + acc_noise_std**2).to(device)},
-    #     'vel': {'mean': torch.FloatTensor(metadata['vel_mean']).to(device),'std': torch.sqrt(torch.FloatTensor(metadata['vel_std'])**2+vel_noise_std**2).to(device)}
-    # }
-
     simulator = learned_simulator.LearnedSimulator(
         num_node_features=NUM_NODE_FEATURES,
         num_edge_features=NUM_EDGE_FEATURES,
         num_message_passing_steps=NUM_MESSAGE_PASSING_STEPS,
         connectivity_radius=metadata['default_connectivity_radius'],
-        # normalization_stats=normalization_stats,
         boundaries=np.array(metadata['bounds']),
         num_encoded_node_features=NUM_ENCODED_NODE_FEATURES,
         num_encoded_edge_features=NUM_ENCODED_EDGE_FEATURES,
@@ -163,7 +146,7 @@ def predict(device: str):
     """
     file = open(f"{FLAGS.output_path}/rollout_loss.txt", 'w')
     metadata = reading_utils.read_metadata(FLAGS.data_path)
-    simulator = get_simulator(metadata, FLAGS.noise_std, FLAGS.noise_std, device)
+    simulator = get_simulator(metadata, device)
     simulator.load(FLAGS.model_path + FLAGS.model_file) # load the pre-trained model; map_location='cpu'
     simulator.to(device)
     simulator.eval() # set the model to evaluation mode
@@ -187,8 +170,7 @@ def predict(device: str):
                                          position_sequence,
                                          particle_properties,
                                          num_particles_in_example,
-                                         num_steps,
-                                         device)
+                                         num_steps)
             
             eval_loss.append(torch.flatten(loss))
             
@@ -205,10 +187,9 @@ def predict(device: str):
     file.close()
     print(f"Mean loss on rollout prediction: {torch.mean(torch.cat(eval_loss))}")
 
-#### RF: to be modified
+
 def optimizer_to(optim, device):
     for param in optim.state.values():
-        # Not sure there are any global tensors in the state dict
         if isinstance(param, torch.Tensor):
             param.data = param.data.to(device)
             if param._grad is not None:
@@ -240,11 +221,11 @@ def train(rank, flags, world_size, device):
 
     # Get simulator and optimizer
     if device == torch.device("cuda"):
-        serial_simulator = get_simulator(metadata, flags["noise_std"], flags["noise_std"], rank)
+        serial_simulator = get_simulator(metadata, rank)
         simulator = DDP(serial_simulator.to(rank), device_ids=[rank], output_device=rank)
         optimizer = torch.optim.Adam(simulator.parameters(), lr=flags["lr_init"]*world_size)
     else:
-        simulator = get_simulator(metadata, flags["noise_std"], flags["noise_std"], device)
+        simulator = get_simulator(metadata, device)
         optimizer = torch.optim.Adam(simulator.parameters(), lr=flags["lr_init"] * world_size)
     step = 0
     
@@ -296,11 +277,8 @@ def train(rank, flags, world_size, device):
                                                     input_length_sequence=C,
                                                     batch_size=flags["batch_size"])
 
-    # print(f"len(dl.dataset._data) is {len(dl.dataset._data)}") # = 6, number of simulations (examples) in the dataset; dl: data loader; dal.dataset: SamplesDataset
-    # print(f"dl.dataset._data[0].shape is {dl.dataset._data[0].shape}")
-    # print(f"dl.dataset._data[0][0].shape is {dl.dataset._data[0][0].shape}")
-    # print(f"n_features is {len(dl.dataset._data[0])}")
-    n_features = len(dl.dataset._data[0]) # Horrible naming! This the size of the Tuple; if =2, it means only particle positions and material type are given. If 3, material property is also given.
+    # len(dl.dataset._data) = C, number of simulations (examples) in the dataset; dl: data loader; dal.dataset: SamplesDataset
+    n_features = len(dl.dataset._data[0]) # size of the tuple; if =2, it only particle positions and material type are given. If 3, material property is also given.
 
     COUNTER = 0
     print(f"rank = {rank}, cuda = {torch.cuda.is_available()}")
@@ -311,15 +289,11 @@ def train(rank, flags, world_size, device):
                 torch.distributed.barrier()
             else:
                 pass
-            for example in dl:  # ((position, particle_properties, material_property, n_particles_per_example), labels) are in dl
+            for example in dl:
                 COUNTER += 1
-                # print(f"counter is {COUNTER}")
-                # print(f"inside for example in dl loop") # example here is a list; example[i] is also a list
-                # print(f"len(example) is {len(example)}")
-                # print(f"example[0][0].shape is {example[0][0].shape}") # (num_particles, 6, DIM) last 6 positions; here number_particles is the total number of particles in batch_size examples
-                # print(f"example[0][1].shape is {example[0][1].shape}") # (num_particles, ) particle properties
-                # print(f"example[1].shape is {example[1].shape}")
-                # print(f"example[1] is {example[1]}") # What is this? The second entry of the example list/tuple
+                # example[0][0].shape = (num_particles, C, DIM) last C positions; here number_particles is the total number of particles in batch_size examples
+                # example[0][1].shape = (num_particles, ) particle properties
+                
                 position = example[0][0].to(device_id)
                 particle_properties = example[0][1].to(device_id)
                 if n_features == 3:  # if dl includes material_property
@@ -334,12 +308,9 @@ def train(rank, flags, world_size, device):
                 n_particles_per_example.to(device_id)
                 labels.to(device_id)
 
-                # Sample the noise to add to the inputs to the model during training.
                 sampled_noise = noise_utils.get_random_walk_noise_for_position_sequence(position, noise_std_last_step=flags["noise_std"]).to(device_id)
                 # Get the predictions and target accelerations.
                 if device == torch.device("cuda"):
-                    # print(f"inside the train loop for cuda block")
-                    # print(f"nparticles_per_example is {n_particles_per_example}")
                     pred_acc, target_acc = simulator.module.predict_acceleration(
                         next_position=labels.to(rank),
                         position_sequence=position.to(rank),
@@ -367,9 +338,7 @@ def train(rank, flags, world_size, device):
 
                 # Update learning rate
                 # exponential decay
-                lr_new = flags["lr_init"]*(flags["lr_decay"] ** (step/flags["lr_decay_steps"])) * world_size
-                # # step decay
-                # lr_new = flags["lr_init"]*(flags["lr_decay"]**(step//flags["lr_decay_steps"])) * world_size
+                lr_new = flags["lr_init"]*(flags["lr_decay"]**(step/flags["lr_decay_steps"]))*world_size
                 for param in optimizer.param_groups:
                     param['lr'] = lr_new
 
@@ -453,7 +422,7 @@ def main(_):
             world_size = 1
             train(rank, myflags, world_size, device)
 
-    elif FLAGS.mode in ['valid', 'rollout']:
+    elif FLAGS.mode == 'rollout':
         # Set device
         world_size = torch.cuda.device_count()
         if FLAGS.cuda_device_number is not None and torch.cuda.is_available():
