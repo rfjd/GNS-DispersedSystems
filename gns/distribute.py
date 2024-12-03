@@ -1,3 +1,9 @@
+"""
+This script is borrowed from:
+https://github.com/geoelements/gns
+
+Minor modifications have been made.
+"""
 from gns import seed_util
 seed_util.apply_seed()
 
@@ -16,8 +22,7 @@ def setup(rank, world_size, device):
     # Initialize group, blocks until all processes join.
     torch.distributed.init_process_group(backend="nccl",
                                          rank=rank,
-                                         world_size=world_size,
-                                        )
+                                         world_size=world_size)
 
 def cleanup():
     """
@@ -37,9 +42,7 @@ def spawn_train(train_fxn, flags, world_size, device):
     """
     torch.multiprocessing.spawn(train_fxn,
                                 args=(flags, world_size, device),
-                                nprocs=world_size,
-                                join=True
-                                )
+                                nprocs=world_size,join=True)
 
 
 def get_data_distributed_dataloader_by_samples(path, input_length_sequence, batch_size, shuffle=True):

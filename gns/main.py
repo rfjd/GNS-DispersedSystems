@@ -1,3 +1,9 @@
+"""
+Some sections of this interface are borrowed from:
+https://github.com/geoelements/gns
+
+Significant modifications have been made to adapt it for our specific use case.
+"""
 from gns import seed_util
 seed_util.initialize_seed(seed=0)
 

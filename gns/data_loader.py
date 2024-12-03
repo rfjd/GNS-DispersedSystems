@@ -1,3 +1,10 @@
+"""
+This script is borrowed from:
+https://github.com/geoelements/gns
+
+Modifications have been made to accept
+float numbers for the particle properties (radii).
+"""
 from gns import seed_util
 seed_util.apply_seed()
 
