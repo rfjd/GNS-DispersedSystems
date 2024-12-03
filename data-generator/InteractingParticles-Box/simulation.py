@@ -1,5 +1,5 @@
 # Aref Hashemi & Aliakbar Izadkhah (2024)
-# This code simulates a two-dimensional mixture of point particles in a box
+# This code simulates a two-dimensional mixture of particles in a box
 
 import numpy as np
 import matplotlib.pyplot as plt
