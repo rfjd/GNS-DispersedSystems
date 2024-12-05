@@ -14,4 +14,4 @@ This work is inspired by the following prior works:
 Use bash script *run.bash* to perform a full training along with rendering and generating animations. Use bash script *rollout_render.bash* to generate outputs from a pretrained model.
 
 **How to cite:**  
-A. Hashemi \& A. Izadkhah, A Graph Neural Network Approach to Dispersed Systems. arXiv:####.##### (2024)
+A. Hashemi \& A. Izadkhah, A Graph Neural Network Approach to Dispersed Systems. arXiv:2412.02967 (2024); https://doi.org/10.48550/arXiv.2412.02967
