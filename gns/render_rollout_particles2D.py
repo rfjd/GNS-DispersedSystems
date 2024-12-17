@@ -81,6 +81,7 @@ class Render():
             ax = fig.add_axes([(left_margin+j*(subplot_width+horizontal_spacing))/fig_width, bottom_margin/fig_height, subplot_width/fig_width, subplot_height/fig_height])
             ax.set_xlim([float(xboundary[0]), float(xboundary[1])])
             ax.set_ylim([float(yboundary[0]), float(yboundary[1])])
+            ax.set_facecolor([0.9, 0.95, 1])  # Set liquid-like background color
             axes.append(ax)
         
         # Define datacase name
